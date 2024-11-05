@@ -78,9 +78,9 @@ int is_file_modified_or_new(const char *index_path, const char *filename, const 
     return 1;
 }
 
-__declspec(dllexport) void stage_file(const char *repo_path, const char *filename) {
-    unsigned char hash[SHA1_BLOCK_SIZE];
+__declspec(dllexport) void stage_file(const char *repo_path, char **filenames, int file_count) {
     char hash_string[SHA1_BLOCK_SIZE*2+1];
+    unsigned char hash[SHA1_BLOCK_SIZE];
     char index_path[MAX_PATH];
     char object_path[MAX_PATH];
 
@@ -97,72 +97,75 @@ __declspec(dllexport) void stage_file(const char *repo_path, const char *filenam
         return;
     }
 
-    sha1_file(filename, hash);
-    sha1_to_hex(hash, hash_string);
+    for (int i = 0; i < file_count; i++) {
+        sha1_file(filenames[i], hash);
+        sha1_to_hex(hash, hash_string);
 
-    FreeLibrary(hSHA1Dll);
+        snprintf(index_path, sizeof(index_path), "%s\\.snaptrack\\index", repo_path);
+        snprintf(object_path, sizeof(object_path), "%s\\.snaptrack\\objects\\%s", repo_path, hash_string);
 
-    snprintf(index_path, sizeof(index_path), "%s\\.snaptrack\\index", repo_path);
-    snprintf(object_path, sizeof(object_path), "%s\\.snaptrack\\objects\\%s", repo_path, hash_string);
+        if (is_file_modified_or_new(index_path, filenames[i], hash_string)) {
+            // Only used for debugging
+            // fprintf(stdout, "%s is modified or new. Staging...\n", filename);
 
-    if (is_file_modified_or_new(index_path, filename, hash_string)) {
-        // Only used for debugging
-        // fprintf(stdout, "%s is modified or new. Staging...\n", filename);
+            FILE *existing_blob = fopen(object_path, "rb");
+            if (!existing_blob) {
+                FILE *object_file = fopen(object_path, "wb");
+                if (!object_file) {
+                    perror("Failed to create object file");
+                    return;
+                }
 
-        FILE *existing_blob = fopen(object_path, "rb");
-        if (!existing_blob) {
-            FILE *object_file = fopen(object_path, "wb");
-            if (!object_file) {
-                perror("Failed to create object file");
-                return;
-            }
+                FILE *src_file = fopen(filenames[i], "rb");
+                if (!src_file) {
+                    perror("Failed to open source file");
+                    fclose(object_file);
+                    return;
+                }
 
-            FILE *src_file = fopen(filename, "rb");
-            if (!src_file) {
-                perror("Failed to open source file");
+                int c;
+                while ((c = fgetc(src_file)) != EOF) {
+                    fputc(c, object_file);
+                }
+                fclose(src_file);
                 fclose(object_file);
-                return;
+            } else {
+                fclose(existing_blob);
             }
 
-            int c;
-            while ((c = fgetc(src_file)) != EOF) {
-                fputc(c, object_file);
-            }
-            fclose(src_file);
-            fclose(object_file);
-        } else {
-            fclose(existing_blob);
-        }
+            FILE *index_file = fopen(index_path, "r+");
+            FILE *temp_file = fopen("temp_index", "w");
 
-        FILE *index_file = fopen(index_path, "r+");
-        FILE *temp_file = fopen("temp_index", "w");
+            char line[1024];
+            int found = 0;
+            if (index_file) {
+                while (fgets(line, sizeof(line), index_file)) {
+                    char stored_filename[512];
+                    char stored_hash[SHA1_BLOCK_SIZE*2+1];
 
-        char line[1024];
-        int found = 0;
-        if (index_file) {
-            while (fgets(line, sizeof(line), index_file)) {
-                char stored_filename[512];
-                char stored_hash[SHA1_BLOCK_SIZE*2+1];
-
-                if (sscanf(line, "%s %s", stored_filename, stored_hash) == 2) {
-                    if (strcmp(stored_filename, filename) == 0) {
-                        fprintf(temp_file, "%s %s\n", filename, hash_string);
-                        found = 1;
-                    } else {
-                        fprintf(temp_file, "%s", line);
+                    if (sscanf(line, "%s %s", stored_filename, stored_hash) == 2) {
+                        if (strcmp(stored_filename, filenames[i]) == 0) {
+                            fprintf(temp_file, "%s %s\n", filenames[i], hash_string);
+                            found = 1;
+                        } else {
+                            fprintf(temp_file, "%s", line);
+                        }
                     }
                 }
+                fclose(index_file);
             }
-            fclose(index_file);
+
+            if (!found)
+                fprintf(temp_file, "%s %s\n", filenames[i], hash_string);
+
+            fclose(temp_file);
+            remove(index_path);
+            rename("temp_index", index_path);
+
+            fprintf(stdout, "Staged %s with hash %s\n", filenames[i], hash_string);
         }
-
-        if (!found)
-            fprintf(temp_file, "%s %s\n", filename, hash_string);
-
-        fclose(temp_file);
-        remove(index_path);
-        rename("temp_index", index_path);
-
-        fprintf(stdout, "Staged %s with hash %s\n", filename, hash_string);
+        free(filenames[i]);
     }
+
+    FreeLibrary(hSHA1Dll);
 }
