@@ -3,7 +3,7 @@
 #include "fileutils.c"
 
 typedef void (*InitRepositoryFunc)(const char *);
-typedef void (*StageFileFunc)(const char *, char **, int);
+typedef void (*StageFilesFunc)(const char *, char **, int);
 
 int main(int argc, char *argv[]) {
     if (strcmp(argv[1], "init") == 0) {
@@ -22,15 +22,16 @@ int main(int argc, char *argv[]) {
 
         init_repository(".");
         FreeLibrary(hLib);
-    } else if (strcmp(argv[1], "add") == 0) {
+
+    } else if (strcmp(argv[1], "stage") == 0) {
         HINSTANCE hLib = LoadLibrary("snaptrack_lib.dll");
         if (!hLib) {
             fprintf(stderr, "Failed to load snaptrack_lib.dll\n");
             return 1;
         }
 
-        StageFileFunc stage_file = (StageFileFunc)GetProcAddress(hLib, "stage_file");
-        if (!stage_file) {
+        StageFilesFunc stage_files = (StageFilesFunc)GetProcAddress(hLib, "stage_files");
+        if (!stage_files) {
             fprintf(stderr, "Failed to find stage_file in snaptrack_lib.dll\n");
             FreeLibrary(hLib);
             return 1;
@@ -39,11 +40,12 @@ int main(int argc, char *argv[]) {
         char **filenames = NULL;
         int count = 0;
 
-        store_filenames(argv[2], &filenames, &count);
-        stage_file(".", filenames, count);
+        store_filenames(".", &filenames, &count, ".snaptrackignore");
+        stage_files(".", filenames, count);
 
         free(filenames);
         FreeLibrary(hLib);
+
     } else {
         fprintf(stderr, "Unkwon command: %s\n", argv[1]);
         return 1;

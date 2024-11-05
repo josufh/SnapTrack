@@ -78,7 +78,7 @@ int is_file_modified_or_new(const char *index_path, const char *filename, const 
     return 1;
 }
 
-__declspec(dllexport) void stage_file(const char *repo_path, char **filenames, int file_count) {
+__declspec(dllexport) void stage_files(const char *repo_path, char **filenames, int file_count) {
     char hash_string[SHA1_BLOCK_SIZE*2+1];
     unsigned char hash[SHA1_BLOCK_SIZE];
     char index_path[MAX_PATH];
