@@ -12,7 +12,11 @@
 typedef struct {
     char *filename;
     char blob_hash[SHA1_BLOCK_SIZE*2+1];
-    int status; // 0:Staged no changes; 1:Staged changes; 2:Deleted
+} File;
+
+typedef struct {
+    File file;
+    int status;
 } StagedFile;
 
 typedef void (*SHA1FileFunc)(const char *filename, unsigned char output[SHA1_BLOCK_SIZE]);
@@ -218,9 +222,9 @@ __declspec(dllexport) void check_status(const char *repo_path) {
     while (fgets(line, sizeof(line), index_file)) {
         staged_files = realloc(staged_files, (staged_count+1)*sizeof(StagedFile));
         StagedFile *current = &staged_files[staged_count];
-        current->filename = malloc(512);
+        current->file.filename = malloc(512);
 
-        sscanf(line, "%s %s", current->filename, current->blob_hash);
+        sscanf(line, "%s %s", current->file.filename, current->file.blob_hash);
         current->status = 2;
         staged_count++;
     }
@@ -239,10 +243,10 @@ __declspec(dllexport) void check_status(const char *repo_path) {
         int found = 0;
 
         for (int j = 0; j < staged_count; j++) {
-            if (strcmp(staged_files[j].filename, filenames[i]) == 0) {
+            if (strcmp(staged_files[j].file.filename, filenames[i]) == 0) {
                 found = 1;
                 staged_files[j].status = 0;
-                if (strcmp(staged_files[j].blob_hash, current_hash) != 0) {
+                if (strcmp(staged_files[j].file.blob_hash, current_hash) != 0) {
                     staged_files[j].status = 1;
                 }
                 break;
@@ -265,7 +269,7 @@ __declspec(dllexport) void check_status(const char *repo_path) {
                 print = 0;
                 printf("Deleted:\n");
             }
-            printf("\t%s\n", staged_files[i].filename);
+            printf("\t%s\n", staged_files[i].file.filename);
         }
     }
     print = 1;
@@ -275,7 +279,7 @@ __declspec(dllexport) void check_status(const char *repo_path) {
                 print = 0;
                 printf("Tracked but modified:\n");
             }
-            printf("\t%s\n", staged_files[i].filename);
+            printf("\t%s\n", staged_files[i].file.filename);
         }
     }
     print = 1;
@@ -285,12 +289,12 @@ __declspec(dllexport) void check_status(const char *repo_path) {
                 print = 0;
                 printf("Staged:\n");
             }
-            printf("\t%s\n", staged_files[i].filename);
+            printf("\t%s\n", staged_files[i].file.filename);
         }
     }
 
     for (int i = 0; i < staged_count; i++) {
-        free(staged_files[i].filename);
+        free(staged_files[i].file.filename);
     }
     free(staged_files);
 
