@@ -2,26 +2,6 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Build SnapTrack Library",
-            "type": "shell",
-            "command": "gcc",
-            "args": [
-                "-g",
-                "-shared",
-                "-o",
-                "snaptrack_lib.dll",
-                "snaptrack_lib.c",
-                "-L.",
-                "-lsha1"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": false
-            },
-            "problemMatcher": ["$gcc"],
-            "detail": "Compile snaptrack_lib.c as a shared library DLL"
-        },
-        {
             "label": "Build SnapTrack",
             "type": "shell",
             "command": "gcc",
@@ -31,7 +11,7 @@
                 "snaptrack",
                 "snaptrack.c",
                 "-L.",
-                "-lsnaptrack_lib"
+                "-lsha1"
             ],
             "group": {
                 "kind": "build",

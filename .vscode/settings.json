@@ -3,6 +3,8 @@
     "files.associations": {
         "windows.h": "c",
         "algorithm": "c",
-        "format": "c"
+        "format": "c",
+        "dirent.h": "c",
+        "direct.h": "c"
     }
 }

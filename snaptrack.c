@@ -1,65 +1,28 @@
 #include <stdio.h>
 #include <windows.h>
-
-typedef void (*InitRepositoryFunc)(const char *);
-typedef void (*StageFilesFunc)(const char *);
-typedef void (*CheckStatusFunc)(const char *);
+#include "snaptrack_lib.c"
+#include "stringutils.c"
 
 int main(int argc, char *argv[]) {
-    if (strcmp(argv[1], "init") == 0) {
-        HINSTANCE hLib = LoadLibrary("snaptrack_lib.dll");
-        if (!hLib) {
-            fprintf(stderr, "Failed to load snaptrack_lib.dll\n");
-            return 1;
-        }
+    if (argc < 2)
+        return 1;
+    
+    const char *repo_path = ".";
 
-        InitRepositoryFunc init_repository = (InitRepositoryFunc)GetProcAddress(hLib, "init_repository");
-        if (!init_repository) {
-            fprintf(stderr, "Failed to find init_repository in snaptrack_lib.dll\n");
-            FreeLibrary(hLib);
-            return 1;
-        }
+    switch (which_command(argv[1])) {
+    case Init:
+        init_repository(repo_path);
+        break;
+    
+    case Status:
+        check_status(repo_path);
+        break;
 
-        init_repository(".");
-        FreeLibrary(hLib);
+    case Stage:
+        stage_files(repo_path);
+        break;
 
-    } else if (strcmp(argv[1], "stage") == 0) {
-        HINSTANCE hLib = LoadLibrary("snaptrack_lib.dll");
-        if (!hLib) {
-            fprintf(stderr, "Failed to load snaptrack_lib.dll\n");
-            return 1;
-        }
-
-        StageFilesFunc stage_files = (StageFilesFunc)GetProcAddress(hLib, "stage_files");
-        if (!stage_files) {
-            fprintf(stderr, "Failed to find stage_file in snaptrack_lib.dll\n");
-            FreeLibrary(hLib);
-            return 1;
-        }
-
-        stage_files(".");
-
-        FreeLibrary(hLib);
-
-    } else if (strcmp(argv[1], "status") == 0) {
-        HINSTANCE hLib = LoadLibrary("snaptrack_lib.dll");
-        if (!hLib) {
-            fprintf(stderr, "Failed to load snaptrack_lib.dll\n");
-            return 1;
-        }
-
-        CheckStatusFunc check_status = (CheckStatusFunc)GetProcAddress(hLib, "check_status");
-        if (!check_status) {
-            fprintf(stderr, "Failed to find check_status in snaptrack_lib.dll\n");
-            FreeLibrary(hLib);
-            return 1;
-        }
-
-        check_status(".");
-
-        FreeLibrary(hLib);
-
-    } else {
+    default:
         fprintf(stderr, "Unkwon command: %s\n", argv[1]);
         return 1;
     }

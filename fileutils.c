@@ -1,13 +1,61 @@
+#ifndef FILEUTILS
+#define FILEUTILS
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <windows.h>
+#include <direct.h>
+#include <errno.h>
+
+#define SHA1_BLOCK_SIZE 20
+
+typedef enum {
+    Staged = 0,
+    New,
+    Modified,
+    Deleted
+} FileStatus;
 
 typedef struct {
     char filename[MAX_PATH];
-    char blob_hash[41];
-    int status;
+    char blob_hash[SHA1_BLOCK_SIZE*2+1];
+    FileStatus status;
 } File;
+
+typedef struct {
+    File *items;
+    int count;
+} Files;
+
+const char *file_status_string[] = {"Staged", "New", "Modified", "Deleted"};
+
+void print_files_by_status(Files files, FileStatus status) {
+    int print = 1;
+    for (int i = 0; i < files.count; i++) {
+        if (files.items[i].status == status) {
+            if (print) {
+                print = 0;
+                fprintf(stdout, "%s files:\n", file_status_string[status]);
+            }
+            fprintf(stdout, "\t%s\n", files.items[i].filename);
+        } 
+    }
+    if (!print) fprintf(stdout, "\n");
+}
+
+FILE *file_open(const char* filepath, const char* mode) {
+    FILE *file = fopen(filepath, mode);
+    if (!file) {
+        fprintf(stderr, "Failed to open file: %s\n", filepath);
+        exit(EXIT_FAILURE);
+    }
+    return file;
+}
+
+void free_files(Files *files) {
+    free(files->items);
+}
 
 int wildcard_match(const char *pattern, const char *str) {
     while (*pattern)
@@ -70,7 +118,7 @@ void load_ignore_patterns(const char *ignore_file_path, char ***ignore_patterns,
     (*ignore_count)++;
 }
 
-void store_filenames(const char *path, File *repo_files, int *count, const char *ignore_file_path) {
+void get_repo_files(const char *path, Files *repo_files, const char *ignore_file_path) {
     char **ignore_patterns = NULL;
     int ignore_count = 0;
     load_ignore_patterns(ignore_file_path, &ignore_patterns, &ignore_count);
@@ -97,16 +145,21 @@ void store_filenames(const char *path, File *repo_files, int *count, const char 
 
         int is_directory = (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 
-        if (should_ignore(full_path, ignore_patterns, ignore_count, is_directory))
+        if (should_ignore(relative_path, ignore_patterns, ignore_count, is_directory))
             continue;
 
         if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-            store_filenames(full_path, repo_files, count, ignore_file_path);
+            get_repo_files(full_path, repo_files, ignore_file_path);
         } else {
-            repo_files = realloc(repo_files, (*count + 1) * sizeof(char *));
-            strcpy(repo_files[*count].filename, relative_path);
-            repo_files[*count].status = 0;
-            (*count)++;
+            File *new_items = realloc(repo_files->items, (repo_files->count + 1)*sizeof(File));
+            if (!new_items) {
+                fprintf(stderr, "Failed to allocate memory\n");
+                exit(EXIT_FAILURE);
+            }
+            repo_files->items = new_items;
+            strcpy(repo_files->items[repo_files->count].filename, relative_path);
+            repo_files->items[repo_files->count].status = New;
+            repo_files->count++;
         }
     } while (FindNextFile(hFind, &find_data) != 0);
 
@@ -117,3 +170,57 @@ void store_filenames(const char *path, File *repo_files, int *count, const char 
     }
     free(ignore_patterns);
 }
+
+void check_repo_exists(const char *repo_path) {
+    char path[MAX_PATH];
+    snprintf(path, sizeof(path), "%s\\.snaptrack", repo_path);
+    if (_access(path, 0) == 0) {
+        fprintf(stderr, "A SnapTrack repository already exists at this location.\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void make_directory(const char *repo_path, const char *subdir) {
+    char path[MAX_PATH];
+    snprintf(path, sizeof(path), "%s\\.snaptrack\\%s", repo_path, subdir);
+    if (_mkdir(path) != 0 && errno != EEXIST) {
+        fprintf(stderr, "Error at snaptrack init\n");
+        perror("Failed to create directory");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void create_file(const char *repo_path, const char *subpath, const char *content) {
+    char path[MAX_PATH];
+    snprintf(path, sizeof(path), "%s\\.snaptrack\\%s", repo_path, subpath);
+    FILE *file = fopen(path, "w");
+    if (file == NULL) {
+        fprintf(stderr, "Error at snaptrack init\n");
+        perror("Failed to create file");
+        exit(EXIT_FAILURE);
+    }
+    if (content) fprintf(file, "%s", content);
+    fclose(file);
+}
+
+int is_file_modified_or_new(const char *index_path, const char *filename, const char *current_hash) {
+    FILE *index_file = fopen(index_path, "r");
+    if (!index_file) return 1;
+
+    char line[1024];
+    while (fgets(line, sizeof(line), index_file)) {
+        char stored_filename[512];
+        char stored_hash[SHA1_BLOCK_SIZE*2+1];
+
+        if (sscanf(line, "%s %s", stored_filename, stored_hash) == 2) {
+            if (strcmp(stored_filename, filename) == 0) {
+                fclose(index_file);
+                return strcmp(stored_hash, current_hash) != 0;
+            }
+        }
+    }
+    fclose(index_file);
+    return 1;
+}
+
+#endif // FILEUTILS

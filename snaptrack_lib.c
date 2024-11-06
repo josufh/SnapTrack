@@ -5,240 +5,210 @@
 #include <windows.h>
 #include <dirent.h>
 #include "fileutils.c"
+#include "stringutils.c"
 
-// NEVER CHANGE VALUE
-#define SHA1_BLOCK_SIZE 20
+typedef void (*SHA1FileFunc)(const char *filename, unsigned char hash[SHA1_BLOCK_SIZE]);
 
-typedef void (*SHA1FileFunc)(const char *filename, unsigned char output[SHA1_BLOCK_SIZE]);
+typedef struct {
+    HMODULE handle;
+    void *func;
+} DLL;
 
-__declspec(dllexport) void init_repository(const char *repo_path) {
-    char path[1024];
-
-    // Create main .snaptrack directory
-    snprintf(path, sizeof(path), "%s\\.snaptrack", repo_path);
-    if (_mkdir(path) != 0) {
-        perror("Failed to create .snaptrack direcotry");
-        return;
+void load_library(DLL *dll, const char *dll_path) {
+    dll->handle = LoadLibrary(dll_path);
+    if (!dll->handle) {
+        fprintf(stderr, "Failed to load %s\n", dll_path);
+        exit(EXIT_FAILURE);
     }
+}
 
-    // Create objects direcotry
-    snprintf(path, sizeof(path), "%s\\.snaptrack\\objects", repo_path);
-    if (_mkdir(path) != 0) {
-        perror("Failed to create objects direcotry");
-        return;
+void load_function(DLL *dll, const char *function_name) {
+    dll->func = (void *)GetProcAddress(dll->handle, function_name);
+    if (!dll->func) {
+        fprintf(stderr, "Failed to locate %s in DLL", function_name);
+        FreeLibrary(dll->handle);
+        exit(EXIT_FAILURE);
     }
+}
 
-    // Create the refs/heads directory
-    snprintf(path, sizeof(path), "%s\\.snaptrack\\refs", repo_path);
-    if (_mkdir(path) != 0) {
-        perror("Failed to create refs directory");
-        return;
-    }
-    snprintf(path, sizeof(path), "%s\\.snaptrack\\refs\\heads", repo_path);
-    if (_mkdir(path) != 0) {
-        perror("Failed to create refs/heads directory");
-        return;
-    }
+void free_library(DLL *dll) {
+    FreeLibrary(dll->handle);
+}
 
-    // Create HEAD file
-    snprintf(path, sizeof(path), "%s\\.snaptrack\\HEAD", repo_path);
-    FILE *head_file = fopen(path, "w");
-    if (head_file == NULL) {
-        perror("Failed to create HEAD file");
-        return;
-    }
-    fprintf(head_file, "ref: refs/heads/main\n");
-    fclose(head_file);
+void init_repository(const char *repo_path) {
+    check_repo_exists(repo_path);
+    make_directory(repo_path, "");
+    make_directory(repo_path, "objects");
+    make_directory(repo_path, "refs");
+    make_directory(repo_path, "refs\\heads");
 
-    // Create index file
-    snprintf(path, sizeof(path), "%s\\.snaptrack\\index", repo_path);
-    FILE *index_file = fopen(path, "w");
-    if (index_file == NULL) {
-        perror("Failed to create HEAD file");
-        return;
-    }
-    fclose(index_file);
+    create_file(repo_path, "HEAD", "ref: refs\\heads\\main\n");
+    create_file(repo_path, "index", NULL);
 
     fprintf(stdout, "Initialized local empty SnapTrack repository\n");
 }
 
-void sha1_to_hex(unsigned char hash[SHA1_BLOCK_SIZE], char output[SHA1_BLOCK_SIZE*2+1]) {
-    for (int i = 0; i < SHA1_BLOCK_SIZE; i++) {
-        sprintf(output + (i*2), "%02x", hash[i]);
+void stage_files(const char *repo_path) {
+    DLL sha1_dll;
+    load_library(&sha1_dll, "sha1.dll");
+    load_function(&sha1_dll, "sha1_file");
+    SHA1FileFunc sha1_file = (SHA1FileFunc)sha1_dll.func;
+
+    Files repo_files = {0};
+    get_repo_files(repo_path, &repo_files, ".snaptrackignore");
+
+    for (int i = 0; i < repo_files.count; i++) {
+        unsigned char hash[SHA1_BLOCK_SIZE];
+        sha1_file(repo_files.items[i].filename, hash);
+        sha1_to_hex(hash, repo_files.items[i].blob_hash);
     }
-    output[SHA1_BLOCK_SIZE*2] = '\0';
-}
 
-int is_file_modified_or_new(const char *index_path, const char *filename, const char *current_hash) {
-    FILE *index_file = fopen(index_path, "r");
-    if (!index_file) return 1;
-
+    char index_path[MAX_PATH];
+    char temp_path[MAX_PATH];
+    snprintf(index_path, sizeof(index_path), "%s\\.snaptrack\\index", repo_path);
+    snprintf(temp_path, sizeof(temp_path), "%s\\.snaptrack\\temp_index", repo_path);
+    FILE *index_file = file_open(index_path, "r");
+    
+    Files staged_files = {0};
     char line[1024];
     while (fgets(line, sizeof(line), index_file)) {
-        char stored_filename[512];
-        char stored_hash[SHA1_BLOCK_SIZE*2+1];
-
-        if (sscanf(line, "%s %s", stored_filename, stored_hash) == 2) {
-            if (strcmp(stored_filename, filename) == 0) {
-                fclose(index_file);
-                return strcmp(stored_hash, current_hash) != 0;
-            }
+        File *new_items = realloc(staged_files.items, (staged_files.count+1)*sizeof(File));
+        if (!new_items) {
+            fprintf(stderr, "Failed to allocate memory\n");
+            exit(EXIT_FAILURE);
         }
+        staged_files.items = new_items;
+
+        sscanf(line, "%s %s", staged_files.items[staged_files.count].filename, staged_files.items[staged_files.count].blob_hash);
+        staged_files.items[staged_files.count].status = Deleted;
+        staged_files.count++;
     }
+
     fclose(index_file);
-    return 1;
-}
 
-__declspec(dllexport) void stage_files(const char *repo_path) {
-    char **filenames = NULL;
-    int file_count = 0;
-    store_filenames(".", &filenames, &file_count, ".snaptrackignore");
-    
-    char hash_string[SHA1_BLOCK_SIZE*2+1];
-    unsigned char hash[SHA1_BLOCK_SIZE];
-    char index_path[MAX_PATH];
-    char object_path[MAX_PATH];
 
-    HMODULE hSHA1Dll = LoadLibrary("sha1.dll");
-    if (!hSHA1Dll) {
-        perror("Failed to load sha1.dll");
-        return;
-    }
-
-    SHA1FileFunc sha1_file = (SHA1FileFunc)GetProcAddress(hSHA1Dll, "sha1_file");
-    if (!sha1_file) {
-        perror("Failed to locate sha1_file in DLL");
-        FreeLibrary(hSHA1Dll);
-        return;
-    }
-
-    for (int i = 0; i < file_count; i++) {
-        sha1_file(filenames[i], hash);
-        sha1_to_hex(hash, hash_string);
-
-        snprintf(index_path, sizeof(index_path), "%s\\.snaptrack\\index", repo_path);
-        snprintf(object_path, sizeof(object_path), "%s\\.snaptrack\\objects\\%s", repo_path, hash_string);
-
-        if (is_file_modified_or_new(index_path, filenames[i], hash_string)) {
-            FILE *existing_blob = fopen(object_path, "rb");
-            if (!existing_blob) {
-                FILE *object_file = fopen(object_path, "wb");
-                if (!object_file) {
-                    perror("Failed to create object file");
-                    return;
+    for (int i = 0; i < staged_files.count; i++) {
+        File *filei = &staged_files.items[i];
+        for (int j = 0; j < repo_files.count; j++) {
+            File *filer = &repo_files.items[j];
+            if (is_same_string(filei->filename, filer->filename)) {
+                if (is_same_string(filei->blob_hash, filer->blob_hash)) {
+                    filei->status = Staged;
+                    filer->status = Staged;
+                    break;
                 }
-                
-                FILE *src_file = fopen(filenames[i], "rb");
-                if (!src_file) {
-                    perror("Failed to open source file");
-                    fclose(object_file);
-                    return;
-                }
-                
-                int c;
-                while ((c = fgetc(src_file)) != EOF) {
-                    fputc(c, object_file);
-                }
-                fclose(src_file);
-                fclose(object_file);
-            } else {
-                fclose(existing_blob);
+                filei->status = Modified;
+                filer->status = Modified;
+                break;
             }
-
-            FILE *index_file = fopen(index_path, "r+");
-            FILE *temp_file = fopen("temp_index", "w");
-
-            char line[1024];
-            int found = 0;
-            if (index_file) {
-                while (fgets(line, sizeof(line), index_file)) {
-                    char stored_filename[512];
-                    char stored_hash[SHA1_BLOCK_SIZE*2+1];
-
-                    if (sscanf(line, "%s %s", stored_filename, stored_hash) == 2) {
-                        if (strcmp(stored_filename, filenames[i]) == 0) {
-                            fprintf(temp_file, "%s %s\n", filenames[i], hash_string);
-                            found = 1;
-                        } else {
-                            fprintf(temp_file, "%s", line);
-                        }
-                    }
-                }
-                fclose(index_file);
-            }
-
-            if (!found)
-                fprintf(temp_file, "%s %s\n", filenames[i], hash_string);
-
-            fclose(temp_file);
-            remove(index_path);
-            rename("temp_index", index_path);
-
-            fprintf(stdout, "Staged %s with hash %s\n", filenames[i], hash_string);
         }
-        free(filenames[i]);
     }
 
-    FreeLibrary(hSHA1Dll);
-    free(filenames);
+    char object_path[MAX_PATH];
+    FILE *temp_file = file_open(temp_path, "w");
+
+    for (int i = 0; i < repo_files.count; i++) {
+        File file = repo_files.items[i];
+        if (file.status == Modified || file.status == New) {
+            snprintf(object_path, sizeof(object_path), "%s\\.snaptrack\\objects\\%s", repo_path, file.blob_hash);
+            FILE *object_file = file_open(object_path, "wb");
+            FILE *src_file = file_open(file.filename, "rb");
+
+            int c;
+            while ((c = fgetc(src_file)) != EOF) {
+                fputc(c, object_file);
+            }
+
+            fclose(object_file); fclose(src_file);
+
+            fprintf(stdout, "Stated changes for file %s with hash %s\n", file.filename, file.blob_hash);
+        }
+        fprintf(temp_file, "%s %s\n", file.filename, file.blob_hash);
+
+    }
+    fclose(temp_file);
+    remove(index_path);
+    rename(temp_path, index_path);
+
+    free_files(&staged_files);
+    free_files(&repo_files);
+
+    free_library(&sha1_dll);
 }
 
-__declspec(dllexport) void check_status(const char *repo_path) {
+void check_status(const char *repo_path) {
     char index_path[MAX_PATH];
     snprintf(index_path, sizeof(index_path), "%s\\.snaptrack\\index", repo_path);
 
-    FILE *index_file = fopen(index_path, "r");
-    if (!index_file) {
-        perror("Failed to open .snaptrack/index");
-        return;
-    }
+    FILE *index_file = file_open(index_path, "r");
 
-    HMODULE hSHA1Dll = LoadLibrary("sha1.dll");
-    if (!hSHA1Dll) {
-        perror("Failed to load sha1.dll");
-        return;
-    }
+    DLL sha1_dll;
+    load_library(&sha1_dll, "sha1.dll");
+    load_function(&sha1_dll, "sha1_file");
+    SHA1FileFunc sha1_file = (SHA1FileFunc)sha1_dll.func;
 
-    SHA1FileFunc sha1_file = (SHA1FileFunc)GetProcAddress(hSHA1Dll, "sha1_file");
-    if (!sha1_file) {
-        perror("Failed to locate sha1_file in DLL");
-        FreeLibrary(hSHA1Dll);
-        return;
-    }
-
-    File *staged_files = NULL;
-    int staged_count = 0;
+    Files staged_files = {0};
     char line[1024];
     while (fgets(line, sizeof(line), index_file)) {
-        staged_files = realloc(staged_files, (staged_count+1)*sizeof(File));
-        File *current = &staged_files[staged_count];
+        File *new_items = realloc(staged_files.items, (staged_files.count+1)*sizeof(File));
+        if (!new_items) {
+            fprintf(stderr, "Failed to allocate memory\n");
+            exit(EXIT_FAILURE);
+        }
+        staged_files.items = new_items;
 
-        sscanf(line, "%s %s", current->filename, current->blob_hash);
-        current->status = 2;
-        staged_count++;
+        sscanf(line, "%s %s", staged_files.items[staged_files.count].filename, staged_files.items[staged_files.count].blob_hash);
+        staged_files.items[staged_files.count].status = Deleted;
+        staged_files.count++;
     }
-    fclose(index_file);
 
-    File *repo_files = NULL;
-    int repo_file_count = 0;
-    store_filenames(repo_path, repo_files, &repo_file_count, ".snaptrackignore");
-    for (int i = 0; i < repo_file_count; i++) {
+    Files repo_files = {0};
+    get_repo_files(repo_path, &repo_files, ".snaptrackignore");
+
+    for (int i = 0; i < repo_files.count; i++) {
         unsigned char hash[SHA1_BLOCK_SIZE];
-        sha1_file(repo_files[i].filename, hash);
-        strcpy(repo_files[i].blob_hash, hash);
+        sha1_file(repo_files.items[i].filename, hash);
+        sha1_to_hex(hash, repo_files.items[i].blob_hash);
     }
 
-    for (int i = 0; i < staged_count; i++) {
-        for (int j = 0; j < repo_file_count; j++) {
-            if (strcmp(staged_files[i].filename, repo_files[j].filename) == 0) {
-                repo_files[j].status = 1; // Tracked
-                staged_files[i].status = 1;
+    for (int i = 0; i < staged_files.count; i++) {
+        File *filei = &staged_files.items[i];
+        for (int j = 0; j < repo_files.count; j++) {
+            File *filer = &repo_files.items[j];
+            if (is_same_string(filei->filename, filer->filename)) {
+                if (is_same_string(filei->blob_hash, filer->blob_hash)) {
+                    filei->status = Staged;
+                    filer->status = Staged;
+                    break;
+                }
+                filei->status = Modified;
+                filer->status = Modified;
+                break;
             }
         }
     }
 
-    free(staged_files);
-    free(repo_files);
+    print_files_by_status(staged_files, Modified);
+    print_files_by_status(repo_files, New);
+    print_files_by_status(staged_files, Deleted);
 
-    FreeLibrary(hSHA1Dll);
+    free_files(&staged_files);
+    free_files(&repo_files);
+
+    free_library(&sha1_dll);
+    fclose(index_file);
+}
+
+typedef enum {
+    Init = 0,
+    Status,
+    Stage,
+    UnknownCommand
+} Command;
+
+Command which_command(const char *command) {
+    if (is_same_string(command, "init")) return Init;
+    else if (is_same_string(command, "status")) return Status;
+    else if (is_same_string(command, "stage")) return Stage;
+    else return UnknownCommand;
 }
