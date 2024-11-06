@@ -9,6 +9,11 @@
 // NEVER CHANGE VALUE
 #define SHA1_BLOCK_SIZE 20
 
+typedef struct {
+    char *filename;
+    char blob_hash[SHA1_BLOCK_SIZE*2+1];
+} StagedFile;
+
 typedef void (*SHA1FileFunc)(const char *filename, unsigned char output[SHA1_BLOCK_SIZE]);
 
 __declspec(dllexport) void init_repository(const char *repo_path) {
@@ -177,6 +182,79 @@ __declspec(dllexport) void stage_files(const char *repo_path) {
     free(filenames);
 }
 
-/* __declspec(dllexport) void check_status(const char *path) {
+__declspec(dllexport) void check_status(const char *repo_path) {
+    char index_path[MAX_PATH];
+    snprintf(index_path, sizeof(index_path), "%s\\.snaptrack\\index", repo_path);
 
-} */
+    FILE *index_file = fopen(index_path, "r");
+    if (!index_file) {
+        perror("Failed to open .snaptrack/index");
+        return;
+    }
+
+    HMODULE hSHA1Dll = LoadLibrary("sha1.dll");
+    if (!hSHA1Dll) {
+        perror("Failed to load sha1.dll");
+        return;
+    }
+
+    SHA1FileFunc sha1_file = (SHA1FileFunc)GetProcAddress(hSHA1Dll, "sha1_file");
+    if (!sha1_file) {
+        perror("Failed to locate sha1_file in DLL");
+        FreeLibrary(hSHA1Dll);
+        return;
+    }
+
+    StagedFile *staged_files = NULL;
+    int staged_count = 0;
+    char line[1024];
+    while (fgets(line, sizeof(line), index_file)) {
+        staged_files = realloc(staged_files, (staged_count+1)*sizeof(StagedFile));
+        StagedFile *current = &staged_files[staged_count];
+        current->filename = malloc(512);
+
+        sscanf(line, "%s %s", current->blob_hash, current->filename);
+        staged_count++;
+    }
+    fclose(index_file);
+
+    char **filenames = NULL;
+    int file_count = 0;
+    store_filenames(repo_path, &filenames, &file_count, ".snaptrackignore");
+
+    for (int i = 0; i < file_count; i++) {
+        char current_hash[SHA1_BLOCK_SIZE*2+1];
+        unsigned char hash[SHA1_BLOCK_SIZE];
+        sha1_file(filenames[i], hash);
+        sha1_to_hex(hash, current_hash);
+
+        int is_staged = 0, is_modified = 0;
+
+        for (int j = 0; j < staged_count; j++) {
+            if (strcmp(staged_files[j].filename, filenames[i]) == 0) {
+                is_staged = 1;
+                if (strcmp(staged_files[j].blob_hash, current_hash) != 0) {
+                    is_modified = 1;
+                }
+                break;
+            }
+        }
+
+        if (is_staged && is_modified) {
+            printf("Modified but not staged: %s\n", filenames[i]);
+        } else if (is_staged) {
+            printf("                 Staged: %s\n", filenames[i]);
+        } else {
+            printf("              Untracked: %s\n", filenames[i]);
+        }
+        free(filenames[i]);
+    }
+    free(filenames);
+
+    for (int i = 0; i < staged_count; i++) {
+        free(staged_files[i].filename);
+    }
+    free(staged_files);
+
+    FreeLibrary(hSHA1Dll);
+}
