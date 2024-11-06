@@ -3,6 +3,12 @@
 #include <string.h>
 #include <windows.h>
 
+typedef struct {
+    char filename[MAX_PATH];
+    char blob_hash[41];
+    int status;
+} File;
+
 int wildcard_match(const char *pattern, const char *str) {
     while (*pattern)
     {
@@ -64,7 +70,7 @@ void load_ignore_patterns(const char *ignore_file_path, char ***ignore_patterns,
     (*ignore_count)++;
 }
 
-void store_filenames(const char *path, char ***filenames, int *count, const char *ignore_file_path) {
+void store_filenames(const char *path, File *repo_files, int *count, const char *ignore_file_path) {
     char **ignore_patterns = NULL;
     int ignore_count = 0;
     load_ignore_patterns(ignore_file_path, &ignore_patterns, &ignore_count);
@@ -91,14 +97,15 @@ void store_filenames(const char *path, char ***filenames, int *count, const char
 
         int is_directory = (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 
-        if (should_ignore(relative_path, ignore_patterns, ignore_count, is_directory))
+        if (should_ignore(full_path, ignore_patterns, ignore_count, is_directory))
             continue;
 
         if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-            store_filenames(full_path, filenames, count, ignore_file_path);
+            store_filenames(full_path, repo_files, count, ignore_file_path);
         } else {
-            *filenames = realloc(*filenames, (*count + 1) * sizeof(char *));
-            (*filenames)[*count] = relative_path;
+            repo_files = realloc(repo_files, (*count + 1) * sizeof(char *));
+            strcpy(repo_files[*count].filename, relative_path);
+            repo_files[*count].status = 0;
             (*count)++;
         }
     } while (FindNextFile(hFind, &find_data) != 0);

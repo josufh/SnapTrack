@@ -9,16 +9,6 @@
 // NEVER CHANGE VALUE
 #define SHA1_BLOCK_SIZE 20
 
-typedef struct {
-    char *filename;
-    char blob_hash[SHA1_BLOCK_SIZE*2+1];
-} File;
-
-typedef struct {
-    File file;
-    int status;
-} StagedFile;
-
 typedef void (*SHA1FileFunc)(const char *filename, unsigned char output[SHA1_BLOCK_SIZE]);
 
 __declspec(dllexport) void init_repository(const char *repo_path) {
@@ -216,87 +206,39 @@ __declspec(dllexport) void check_status(const char *repo_path) {
         return;
     }
 
-    StagedFile *staged_files = NULL;
+    File *staged_files = NULL;
     int staged_count = 0;
     char line[1024];
     while (fgets(line, sizeof(line), index_file)) {
-        staged_files = realloc(staged_files, (staged_count+1)*sizeof(StagedFile));
-        StagedFile *current = &staged_files[staged_count];
-        current->file.filename = malloc(512);
+        staged_files = realloc(staged_files, (staged_count+1)*sizeof(File));
+        File *current = &staged_files[staged_count];
 
-        sscanf(line, "%s %s", current->file.filename, current->file.blob_hash);
+        sscanf(line, "%s %s", current->filename, current->blob_hash);
         current->status = 2;
         staged_count++;
     }
     fclose(index_file);
 
-    char **filenames = NULL;
-    int file_count = 0;
-    store_filenames(repo_path, &filenames, &file_count, ".snaptrackignore");
-    int print = 1;
-
-    for (int i = 0; i < file_count; i++) {
-        char current_hash[SHA1_BLOCK_SIZE*2+1];
+    File *repo_files = NULL;
+    int repo_file_count = 0;
+    store_filenames(repo_path, repo_files, &repo_file_count, ".snaptrackignore");
+    for (int i = 0; i < repo_file_count; i++) {
         unsigned char hash[SHA1_BLOCK_SIZE];
-        sha1_file(filenames[i], hash);
-        sha1_to_hex(hash, current_hash);
-        int found = 0;
-
-        for (int j = 0; j < staged_count; j++) {
-            if (strcmp(staged_files[j].file.filename, filenames[i]) == 0) {
-                found = 1;
-                staged_files[j].status = 0;
-                if (strcmp(staged_files[j].file.blob_hash, current_hash) != 0) {
-                    staged_files[j].status = 1;
-                }
-                break;
-            }
-        }
-        if (!found && print) {
-            printf("Untracked:\n");
-            print = 0;
-        }
-        if (!found) printf("\t%s\n", filenames[i]);
-
-        free(filenames[i]);
-    }
-    free(filenames);
-
-    print = 1;
-    for (int i = 0; i < staged_count; i++) {
-        if (staged_files[i].status == 2) {
-            if (print) {
-                print = 0;
-                printf("Deleted:\n");
-            }
-            printf("\t%s\n", staged_files[i].file.filename);
-        }
-    }
-    print = 1;
-    for (int i = 0; i < staged_count; i++) {
-        if (staged_files[i].status == 1) {
-            if (print) {
-                print = 0;
-                printf("Tracked but modified:\n");
-            }
-            printf("\t%s\n", staged_files[i].file.filename);
-        }
-    }
-    print = 1;
-    for (int i = 0; i < staged_count; i++) {
-        if (staged_files[i].status == 0) {
-            if (print) {
-                print = 0;
-                printf("Staged:\n");
-            }
-            printf("\t%s\n", staged_files[i].file.filename);
-        }
+        sha1_file(repo_files[i].filename, hash);
+        strcpy(repo_files[i].blob_hash, hash);
     }
 
     for (int i = 0; i < staged_count; i++) {
-        free(staged_files[i].file.filename);
+        for (int j = 0; j < repo_file_count; j++) {
+            if (strcmp(staged_files[i].filename, repo_files[j].filename) == 0) {
+                repo_files[j].status = 1; // Tracked
+                staged_files[i].status = 1;
+            }
+        }
     }
+
     free(staged_files);
+    free(repo_files);
 
     FreeLibrary(hSHA1Dll);
 }
