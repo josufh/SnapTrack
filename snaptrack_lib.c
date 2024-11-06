@@ -55,6 +55,15 @@ __declspec(dllexport) void init_repository(const char *repo_path) {
     fprintf(head_file, "ref: refs/heads/main\n");
     fclose(head_file);
 
+    // Create index file
+    snprintf(path, sizeof(path), "%s\\.snaptrack\\index", repo_path);
+    FILE *index_file = fopen(path, "w");
+    if (index_file == NULL) {
+        perror("Failed to create HEAD file");
+        return;
+    }
+    fclose(index_file);
+
     fprintf(stdout, "Initialized local empty SnapTrack repository\n");
 }
 
