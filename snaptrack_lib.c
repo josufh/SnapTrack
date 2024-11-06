@@ -110,6 +110,7 @@ __declspec(dllexport) void stage_files(const char *repo_path, char **filenames, 
 
             FILE *existing_blob = fopen(object_path, "rb");
             if (!existing_blob) {
+                printf("%s\n", object_path);
                 FILE *object_file = fopen(object_path, "wb");
                 if (!object_file) {
                     perror("Failed to create object file");

@@ -1,0 +1,6 @@
+test\
+.git\
+.gitignore
+*.dll
+*.exe
+.vscode\
