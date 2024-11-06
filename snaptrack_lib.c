@@ -12,6 +12,7 @@
 typedef struct {
     char *filename;
     char blob_hash[SHA1_BLOCK_SIZE*2+1];
+    int status; // 0:Staged no changes; 1:Staged changes; 2:Deleted
 } StagedFile;
 
 typedef void (*SHA1FileFunc)(const char *filename, unsigned char output[SHA1_BLOCK_SIZE]);
@@ -125,9 +126,6 @@ __declspec(dllexport) void stage_files(const char *repo_path) {
         snprintf(object_path, sizeof(object_path), "%s\\.snaptrack\\objects\\%s", repo_path, hash_string);
 
         if (is_file_modified_or_new(index_path, filenames[i], hash_string)) {
-            // Only used for debugging
-            // fprintf(stdout, "%s is modified or new. Staging...\n", filename);
-
             FILE *existing_blob = fopen(object_path, "rb");
             if (!existing_blob) {
                 FILE *object_file = fopen(object_path, "wb");
@@ -223,6 +221,7 @@ __declspec(dllexport) void check_status(const char *repo_path) {
         current->filename = malloc(512);
 
         sscanf(line, "%s %s", current->filename, current->blob_hash);
+        current->status = 2;
         staged_count++;
     }
     fclose(index_file);
@@ -230,35 +229,65 @@ __declspec(dllexport) void check_status(const char *repo_path) {
     char **filenames = NULL;
     int file_count = 0;
     store_filenames(repo_path, &filenames, &file_count, ".snaptrackignore");
+    int print = 1;
 
     for (int i = 0; i < file_count; i++) {
         char current_hash[SHA1_BLOCK_SIZE*2+1];
         unsigned char hash[SHA1_BLOCK_SIZE];
         sha1_file(filenames[i], hash);
         sha1_to_hex(hash, current_hash);
-
-        int is_staged = 0, is_modified = 0;
+        int found = 0;
 
         for (int j = 0; j < staged_count; j++) {
             if (strcmp(staged_files[j].filename, filenames[i]) == 0) {
-                is_staged = 1;
+                found = 1;
+                staged_files[j].status = 0;
                 if (strcmp(staged_files[j].blob_hash, current_hash) != 0) {
-                    is_modified = 1;
+                    staged_files[j].status = 1;
                 }
                 break;
             }
         }
-
-        if (is_staged && is_modified) {
-            printf("Modified but not staged: %s\n", filenames[i]);
-        } else if (is_staged) {
-            printf("                 Staged: %s\n", filenames[i]);
-        } else {
-            printf("              Untracked: %s\n", filenames[i]);
+        if (!found && print) {
+            printf("Untracked:\n");
+            print = 0;
         }
+        if (!found) printf("\t%s\n", filenames[i]);
+
         free(filenames[i]);
     }
     free(filenames);
+
+    print = 1;
+    for (int i = 0; i < staged_count; i++) {
+        if (staged_files[i].status == 2) {
+            if (print) {
+                print = 0;
+                printf("Deleted:\n");
+            }
+            printf("\t%s\n", staged_files[i].filename);
+        }
+    }
+    print = 1;
+    for (int i = 0; i < staged_count; i++) {
+        if (staged_files[i].status == 1) {
+            if (print) {
+                print = 0;
+                printf("Tracked but modified:\n");
+            }
+            printf("\t%s\n", staged_files[i].filename);
+        }
+    }
+    print = 1;
+    for (int i = 0; i < staged_count; i++) {
+        if (staged_files[i].status == 0) {
+            if (print) {
+                print = 0;
+                printf("Staged:\n");
+            }
+            printf("\t%s\n", staged_files[i].filename);
+        }
+    }
 
     for (int i = 0; i < staged_count; i++) {
         free(staged_files[i].filename);
