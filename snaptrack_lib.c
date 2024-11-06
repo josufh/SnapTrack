@@ -3,6 +3,8 @@
 #include <direct.h>
 #include <string.h>
 #include <windows.h>
+#include <dirent.h>
+#include "fileutils.c"
 
 // NEVER CHANGE VALUE
 #define SHA1_BLOCK_SIZE 20
@@ -78,7 +80,11 @@ int is_file_modified_or_new(const char *index_path, const char *filename, const 
     return 1;
 }
 
-__declspec(dllexport) void stage_files(const char *repo_path, char **filenames, int file_count) {
+__declspec(dllexport) void stage_files(const char *repo_path) {
+    char **filenames = NULL;
+    int file_count = 0;
+    store_filenames(".", &filenames, &file_count, ".snaptrackignore");
+    
     char hash_string[SHA1_BLOCK_SIZE*2+1];
     unsigned char hash[SHA1_BLOCK_SIZE];
     char index_path[MAX_PATH];
@@ -110,20 +116,19 @@ __declspec(dllexport) void stage_files(const char *repo_path, char **filenames, 
 
             FILE *existing_blob = fopen(object_path, "rb");
             if (!existing_blob) {
-                printf("%s\n", object_path);
                 FILE *object_file = fopen(object_path, "wb");
                 if (!object_file) {
                     perror("Failed to create object file");
                     return;
                 }
-
+                
                 FILE *src_file = fopen(filenames[i], "rb");
                 if (!src_file) {
                     perror("Failed to open source file");
                     fclose(object_file);
                     return;
                 }
-
+                
                 int c;
                 while ((c = fgetc(src_file)) != EOF) {
                     fputc(c, object_file);
@@ -169,4 +174,9 @@ __declspec(dllexport) void stage_files(const char *repo_path, char **filenames, 
     }
 
     FreeLibrary(hSHA1Dll);
+    free(filenames);
 }
+
+/* __declspec(dllexport) void check_status(const char *path) {
+
+} */

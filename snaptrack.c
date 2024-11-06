@@ -1,9 +1,8 @@
 #include <stdio.h>
 #include <windows.h>
-#include "fileutils.c"
 
 typedef void (*InitRepositoryFunc)(const char *);
-typedef void (*StageFilesFunc)(const char *, char **, int);
+typedef void (*StageFilesFunc)(const char *);
 
 int main(int argc, char *argv[]) {
     if (strcmp(argv[1], "init") == 0) {
@@ -37,13 +36,8 @@ int main(int argc, char *argv[]) {
             return 1;
         }
 
-        char **filenames = NULL;
-        int count = 0;
+        stage_files(".");
 
-        store_filenames(".", &filenames, &count, ".snaptrackignore");
-        stage_files(".", filenames, count);
-
-        free(filenames);
         FreeLibrary(hLib);
 
     } else {

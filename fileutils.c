@@ -62,9 +62,6 @@ void load_ignore_patterns(const char *ignore_file_path, char ***ignore_patterns,
     *ignore_patterns = realloc(*ignore_patterns, (*ignore_count + 1)*sizeof(char *));
     (*ignore_patterns)[*ignore_count] = strdup(".snaptrack\\");
     (*ignore_count)++;
-    *ignore_patterns = realloc(*ignore_patterns, (*ignore_count + 1)*sizeof(char *));
-    (*ignore_patterns)[*ignore_count] = strdup(".snaptrackignore");
-    (*ignore_count)++;
 }
 
 void store_filenames(const char *path, char ***filenames, int *count, const char *ignore_file_path) {
