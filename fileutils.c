@@ -86,18 +86,19 @@ void store_filenames(const char *path, char ***filenames, int *count, const char
             continue;
         
         char full_path[MAX_PATH];
-        snprintf(full_path, MAX_PATH, "%s", find_data.cFileName);
+        snprintf(full_path, MAX_PATH, "%s\\%s", path, find_data.cFileName);
+        char *relative_path = _strdup(full_path+2);
 
         int is_directory = (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 
-        if (should_ignore(full_path, ignore_patterns, ignore_count, is_directory))
+        if (should_ignore(relative_path, ignore_patterns, ignore_count, is_directory))
             continue;
 
         if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-            store_filenames(full_path, filenames, count, ".snaptrackignore");
+            store_filenames(full_path, filenames, count, ignore_file_path);
         } else {
             *filenames = realloc(*filenames, (*count + 1) * sizeof(char *));
-            (*filenames)[*count] = _strdup(full_path);
+            (*filenames)[*count] = relative_path;
             (*count)++;
         }
     } while (FindNextFile(hFind, &find_data) != 0);

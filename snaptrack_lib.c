@@ -222,7 +222,7 @@ __declspec(dllexport) void check_status(const char *repo_path) {
         StagedFile *current = &staged_files[staged_count];
         current->filename = malloc(512);
 
-        sscanf(line, "%s %s", current->blob_hash, current->filename);
+        sscanf(line, "%s %s", current->filename, current->blob_hash);
         staged_count++;
     }
     fclose(index_file);
