@@ -6,6 +6,7 @@
 TODO later
 
 not commit if last commit index is same
+snapshot clean (clean blobs that arent used, clean after commit)
 refactor......
 
 */
