@@ -32,6 +32,10 @@ test.txt
 path\to\test.txt
 ```
 
+- `snaptrack commit "<message>"`
+
+Commits current changes.
+
 ## Installation
 
 ***WIP***
