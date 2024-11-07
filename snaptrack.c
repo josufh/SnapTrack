@@ -58,6 +58,14 @@ int main(int argc, char *argv[]) {
         }
         break;
 
+    case Revert:
+        if (argc < 3) {
+            fprintf(stderr, "Wrong usage: snaptrack revert <commit hash>\n");
+            return 1;
+        }
+        revert_commit(argv[2]);
+        break;
+
     default:
         fprintf(stderr, "Unkwon command: %s\n", argv[1]);
         return 1;

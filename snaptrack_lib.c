@@ -116,6 +116,7 @@ typedef enum {
     Stage,
     CommitChanges,
     Config,
+    Revert,
     UnknownCommand
 } Command;
 
@@ -125,6 +126,7 @@ Command which_command(const char *command) {
     else if (is_same_string(command, "stage")) return Stage;
     else if (is_same_string(command, "commit")) return CommitChanges;
     else if (is_same_string(command, "config")) return Config;
+    else if (is_same_string(command, "revert")) return Revert;
     else return UnknownCommand;
 }
 
@@ -501,4 +503,80 @@ void list_commits() {
         fprintf(stdout, "\n");
     }
     free(commits);
+}
+
+// Revert commit
+void revert_commit(const char *revert_hash) {
+    DLL sha1_dll;
+    load_library(&sha1_dll, "sha1.dll");
+    load_function(&sha1_dll, "sha1_file");
+    SHA1FileFunc sha1_file = (SHA1FileFunc)sha1_dll.func;
+
+    Commit revert_commit = {0};
+    get_commit_info(&revert_commit, revert_hash);
+
+    char revert_index_blob_path[PATH_SIZE] = {0};
+    snprintf(revert_index_blob_path, PATH_SIZE, "%s\\.snaptrack\\objects\\%s", REPO_PATH, revert_commit.index_hash);
+    FILE *revert_index_file = file_open(revert_index_blob_path, "r");
+
+    Files revert_files = {0};
+    char line[512];
+    while (fgets(line, 512, revert_index_file)) {
+        File *new_items = realloc(revert_files.items, (revert_files.count+1)*sizeof(File));
+        if (!new_items) {
+            fprintf(stderr, "Failed to allocate memory\n");
+            exit(EXIT_FAILURE);
+        }
+        revert_files.items = new_items;
+
+        sscanf(line, "%s %s", revert_files.items[revert_files.count].path, revert_files.items[revert_files.count].hash);
+        // file status?
+        revert_files.count++;
+    }
+
+    Files repo_files = {0};
+    get_repo_files(REPO_PATH, &repo_files, ".snaptrackignore");
+
+    for (int i = 0; i < repo_files.count; i++) {
+        unsigned char hash[SHA1_BLOCK_SIZE];
+        sha1_file(repo_files.items[i].path, hash);
+        sha1_to_hex(hash, repo_files.items[i].hash);
+    }
+
+    for (int i = 0; i < revert_files.count; i++) {
+        char blob_path[PATH_SIZE];
+        snprintf(blob_path, PATH_SIZE, "%s\\.snaptrack\\objects\\%s", REPO_PATH, revert_files.items[i].hash);
+        FILE *read = file_open(blob_path, "r");
+        FILE *write = file_open(revert_files.items[i].path, "w");
+
+        char buffer[1024];
+        size_t bytes;
+
+        while ((bytes = fread(buffer, 1, sizeof(buffer), read)) > 0) {
+            fwrite(buffer, 1, bytes, write);
+        }
+
+        fclose(read); fclose(write);
+
+        for (int j = 0; j < repo_files.count; j++) {
+            if (is_same_string(revert_files.items[i].path, repo_files.items[j].path)) {
+                repo_files.items[j].status = Staged;
+                break;
+            }
+        }
+    }
+
+    for (int i = 0; i < repo_files.count; i++) {
+        if (repo_files.items[i].status == New) {
+            remove(repo_files.items[i].path);
+        }
+    }
+
+    stage_files(REPO_PATH);
+    char message[256];
+    snprintf(message, 256, "REVERT TO COMMIT HASH: %s", revert_commit.hash);
+    commit_changes(message);
+
+    free_files(&repo_files);
+    free_files(&revert_files);
 }
