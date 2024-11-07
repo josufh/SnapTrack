@@ -2,6 +2,14 @@
 #include <windows.h>
 #include "snaptrack_lib.c"
 
+/*
+TODO later
+
+not commit if last commit index is same
+refactor......
+
+*/
+
 int main(int argc, char *argv[]) {
     if (argc < 2)
         return 1;
@@ -24,9 +32,14 @@ int main(int argc, char *argv[]) {
     case CommitChanges:
         if (argc < 3) {
             fprintf(stderr, "Wrong usage: snaptrack commit \"commit message...\"\n");
+            fprintf(stderr, "             snaptrack commit -l\n");
             return 1;
         }
-        commit_changes(argv[2]);
+        if (strcmp(argv[2], "-l") == 0) {
+            list_commits();
+        } else {
+            commit_changes(argv[2]);
+        }
         break;
 
     case Config:

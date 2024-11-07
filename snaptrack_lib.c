@@ -332,6 +332,7 @@ void check_status(const char *repo_path) {
 typedef struct {
     char index_hash[SHA1_BLOCK_SIZE*2+1];
     char parent[SHA1_BLOCK_SIZE*2+1];
+    char hash[SHA1_BLOCK_SIZE*2+1];
     char author_name[256];
     char author_email[256];
     char author_userid[256];
@@ -433,4 +434,71 @@ void commit_changes(const char *commit_message) {
 
     remove(temp_commit.path);
     free_library(&sha1_dll);
+}
+
+void get_commit_info(Commit *commit, const char *commit_hash) {
+    char object_path[PATH_SIZE];
+    snprintf(object_path, PATH_SIZE, "%s\\.snaptrack\\objects\\%s", REPO_PATH, commit_hash);
+    FILE *object_file = file_open(object_path, "rb");
+
+    // get hash
+    strcpy(commit->hash, commit_hash);
+
+    char line[256], _[256];
+    fgets(line, 256, object_file);
+    sscanf(line, "%s %s", _, commit->index_hash);
+    fgets(line, 256, object_file);
+    sscanf(line, "%s %s", _, commit->parent);
+    fgets(line, 256, object_file);
+    fgets(line, 256, object_file);
+    sscanf(line, "%s", commit->author_name);
+    fgets(line, 256, object_file);
+    sscanf(line, "%s", commit->author_email);
+    fgets(line, 256, object_file);
+    sscanf(line, "%s", commit->author_userid);
+    fgets(line, 256, object_file);
+    sscanf(line, "%s %s", _, commit->timestamp);
+    fgets(line, 256, object_file);
+    fgets(line, 256, object_file);
+    strcpy(commit->message, line);
+
+    fclose(object_file);
+}
+
+// Show commits
+void list_commits() {
+    Commit *commits = NULL;
+    int commit_count = 0;
+
+    // Get last commit hash
+    char head_path[PATH_SIZE];
+    snprintf(head_path, PATH_SIZE, "%s\\.snaptrack\\HEAD", REPO_PATH);
+    FILE *head_file = file_open(head_path, "r");
+    char branch_path[PATH_SIZE];
+    fgets(branch_path, PATH_SIZE, head_file);
+    fclose(head_file);
+
+    char current_branch_path[PATH_SIZE];
+    snprintf(current_branch_path, PATH_SIZE, "%s\\.snaptrack\\%s", REPO_PATH, branch_path);
+    FILE *current_branch_file = file_open(current_branch_path, "r");
+    char last_commit_hash[SHA1_BLOCK_SIZE*2+1] = {0};
+    fgets(last_commit_hash, sizeof(last_commit_hash), current_branch_file);
+
+    while (strcmp(last_commit_hash, "") != 0) {
+        Commit commit = {0};
+        get_commit_info(&commit, last_commit_hash);
+        strcpy(last_commit_hash, commit.parent);
+
+        commits = realloc(commits, (commit_count+1)*sizeof(Commit));
+        commits[commit_count] = commit;
+        commit_count++;
+    }
+
+    fprintf(stdout, "Commit list:\n");
+    for (int i = 0; i < commit_count; i++) {
+        fprintf(stdout, "\t   Hash: %s\n", commits[i].hash);
+        fprintf(stdout, "\tMessage: %s\n", commits[i].message);
+        fprintf(stdout, "\n");
+    }
+    free(commits);
 }

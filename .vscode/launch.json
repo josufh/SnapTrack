@@ -6,7 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}\\snaptrack.exe",
-            "args": ["config", "email", "joshuaferrer@outlook.com"], 
+            "args": ["commit", "-l"], 
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
