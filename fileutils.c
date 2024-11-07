@@ -190,6 +190,10 @@ void repo_must_exist(const char *repo_path) {
     }
 }
 
+int does_dir_exist(const char *path) {
+    return _access(path, 0) == 0;
+}
+
 void make_directory(const char *repo_path, const char *subdir) {
     char path[PATH_SIZE];
     snprintf(path, sizeof(path), "%s\\.snaptrack\\%s", repo_path, subdir);

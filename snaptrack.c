@@ -29,6 +29,21 @@ int main(int argc, char *argv[]) {
         commit_changes(argv[2]);
         break;
 
+    case Config:
+        if (argc < 3) {
+            fprintf(stdout, "SnapTrack configuration:\n");
+            get_config("name");
+            get_config("email");
+            get_config("userid");
+        }
+        else if (argc < 4) {
+            fprintf(stdout, "SnapTrack configuration:\n");
+            get_config(argv[2]);
+        } else {
+            set_config(argv[2], argv[3]);
+        }
+        break;
+
     default:
         fprintf(stderr, "Unkwon command: %s\n", argv[1]);
         return 1;
