@@ -8,6 +8,18 @@ A simplified implementation of version control.
 
 Initializes the SanpTrack repository locally.
 
+- `snaptrack config`
+
+Shows info about user. User info now contains: name, email and user id.
+
+- `snaptrack config <info key>`
+
+Shows the value of the desired info.
+
+- `snaptrack config <info key> <value>`
+
+Sets the desired info to the inputed value.
+
 - `snaptrack stage`
 
 Stages the changes for commit.
@@ -15,6 +27,10 @@ Stages the changes for commit.
 - `snaptrack status`
 
 Prints any changes in the repository since last stage.
+
+- `snaptrack commit "<message>"`
+
+Commits current changes.
 
 - `.snaptrackignore`
 
@@ -31,10 +47,6 @@ test\dir\
 test.txt
 path\to\test.txt
 ```
-
-- `snaptrack commit "<message>"`
-
-Commits current changes.
 
 ## Installation
 
