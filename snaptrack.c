@@ -3,10 +3,15 @@
 #include "snaptrack_lib.c"
 
 /*
+TODO asap
+commit deleted files show message
+
 TODO later
 
 not commit if last commit index is same
 snapshot clean (clean blobs that arent used, clean after commit)
+revert -soft -hard?
+no revert if last commit
 refactor......
 
 */
