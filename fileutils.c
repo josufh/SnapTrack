@@ -9,6 +9,7 @@
 #include <errno.h>
 
 #define SHA1_BLOCK_SIZE 20
+#define PATH_SIZE MAX_PATH
 
 typedef enum {
     Staged = 0,
@@ -18,8 +19,8 @@ typedef enum {
 } FileStatus;
 
 typedef struct {
-    char filename[MAX_PATH];
-    char blob_hash[SHA1_BLOCK_SIZE*2+1];
+    char path[PATH_SIZE];
+    char hash[SHA1_BLOCK_SIZE*2+1];
     FileStatus status;
 } File;
 
@@ -38,7 +39,7 @@ void print_files_by_status(Files files, FileStatus status) {
                 print = 0;
                 fprintf(stdout, "%s files:\n", file_status_string[status]);
             }
-            fprintf(stdout, "\t%s\n", files.items[i].filename);
+            fprintf(stdout, "\t%s\n", files.items[i].path);
         } 
     }
     if (!print) fprintf(stdout, "\n");
@@ -83,11 +84,11 @@ int should_ignore(const char *filename, char **ignore_patterns, int ignore_count
     for (int i = 0; i < ignore_count; i++) {
         int pattern_is_directory = ignore_patterns[i][strlen(ignore_patterns[i])-1] == '\\';
         
-        char full_pattern[MAX_PATH];
+        char full_pattern[PATH_SIZE];
         if (is_directory) {
-            snprintf(full_pattern, MAX_PATH, "%s\\", filename);
+            snprintf(full_pattern, PATH_SIZE, "%s\\", filename);
         } else {
-            strncpy(full_pattern, filename, MAX_PATH);
+            strncpy(full_pattern, filename, PATH_SIZE);
         }
         
         if (is_directory && !pattern_is_directory) continue;
@@ -126,8 +127,8 @@ void get_repo_files(const char *path, Files *repo_files, const char *ignore_file
     WIN32_FIND_DATA find_data;
     HANDLE hFind;
 
-    char search_path[MAX_PATH];
-    snprintf(search_path, MAX_PATH, "%s\\*", path);
+    char search_path[PATH_SIZE];
+    snprintf(search_path, PATH_SIZE, "%s\\*", path);
 
     hFind = FindFirstFile(search_path, &find_data);
     if (hFind == INVALID_HANDLE_VALUE) {
@@ -139,8 +140,8 @@ void get_repo_files(const char *path, Files *repo_files, const char *ignore_file
         if (strcmp(find_data.cFileName, ".") == 0 || strcmp(find_data.cFileName, "..") == 0)
             continue;
         
-        char full_path[MAX_PATH];
-        snprintf(full_path, MAX_PATH, "%s\\%s", path, find_data.cFileName);
+        char full_path[PATH_SIZE];
+        snprintf(full_path, PATH_SIZE, "%s\\%s", path, find_data.cFileName);
         char *relative_path = _strdup(full_path+2);
 
         int is_directory = (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
@@ -157,7 +158,7 @@ void get_repo_files(const char *path, Files *repo_files, const char *ignore_file
                 exit(EXIT_FAILURE);
             }
             repo_files->items = new_items;
-            strcpy(repo_files->items[repo_files->count].filename, relative_path);
+            strcpy(repo_files->items[repo_files->count].path, relative_path);
             repo_files->items[repo_files->count].status = New;
             repo_files->count++;
         }
@@ -171,8 +172,8 @@ void get_repo_files(const char *path, Files *repo_files, const char *ignore_file
     free(ignore_patterns);
 }
 
-void check_repo_exists(const char *repo_path) {
-    char path[MAX_PATH];
+void check_repo_already_exists(const char *repo_path) {
+    char path[PATH_SIZE];
     snprintf(path, sizeof(path), "%s\\.snaptrack", repo_path);
     if (_access(path, 0) == 0) {
         fprintf(stderr, "A SnapTrack repository already exists at this location.\n");
@@ -180,8 +181,17 @@ void check_repo_exists(const char *repo_path) {
     }
 }
 
+void repo_must_exist(const char *repo_path) {
+    char path[PATH_SIZE];
+    snprintf(path, sizeof(path), "%s\\.snaptrack", repo_path);
+    if (_access(path, 0) != 0) {
+        fprintf(stderr, "A SnapTrack repository doesn't exist at this location. Execute 'snaptrack init' before continuing.\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
 void make_directory(const char *repo_path, const char *subdir) {
-    char path[MAX_PATH];
+    char path[PATH_SIZE];
     snprintf(path, sizeof(path), "%s\\.snaptrack\\%s", repo_path, subdir);
     if (_mkdir(path) != 0 && errno != EEXIST) {
         fprintf(stderr, "Error at snaptrack init\n");
@@ -191,7 +201,7 @@ void make_directory(const char *repo_path, const char *subdir) {
 }
 
 void create_file(const char *repo_path, const char *subpath, const char *content) {
-    char path[MAX_PATH];
+    char path[PATH_SIZE];
     snprintf(path, sizeof(path), "%s\\.snaptrack\\%s", repo_path, subpath);
     FILE *file = fopen(path, "w");
     if (file == NULL) {
@@ -201,26 +211,6 @@ void create_file(const char *repo_path, const char *subpath, const char *content
     }
     if (content) fprintf(file, "%s", content);
     fclose(file);
-}
-
-int is_file_modified_or_new(const char *index_path, const char *filename, const char *current_hash) {
-    FILE *index_file = fopen(index_path, "r");
-    if (!index_file) return 1;
-
-    char line[1024];
-    while (fgets(line, sizeof(line), index_file)) {
-        char stored_filename[512];
-        char stored_hash[SHA1_BLOCK_SIZE*2+1];
-
-        if (sscanf(line, "%s %s", stored_filename, stored_hash) == 2) {
-            if (strcmp(stored_filename, filename) == 0) {
-                fclose(index_file);
-                return strcmp(stored_hash, current_hash) != 0;
-            }
-        }
-    }
-    fclose(index_file);
-    return 1;
 }
 
 #endif // FILEUTILS

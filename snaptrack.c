@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <windows.h>
 #include "snaptrack_lib.c"
-#include "stringutils.c"
 
 int main(int argc, char *argv[]) {
     if (argc < 2)
@@ -20,6 +19,14 @@ int main(int argc, char *argv[]) {
 
     case Stage:
         stage_files(repo_path);
+        break;
+
+    case CommitChanges:
+        if (argc < 3) {
+            fprintf(stderr, "Wrong usage: snaptrack commit \"commit message...\"\n");
+            return 1;
+        }
+        commit_changes(argv[2]);
         break;
 
     default:
