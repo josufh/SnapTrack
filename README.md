@@ -32,6 +32,10 @@ Prints any changes in the repository since last stage.
 
 Commits current changes.
 
+- `snaptrack commit -l`
+
+List commits.
+
 - `.snaptrackignore`
 
 File that tells SnapTrack what files and directories to ignore. By default it ignores `.snaptrack\` and `.snaptrackignore`. To ignore directories write the directory path with `\` at the end, for files write the path to the file, you can use wildcards!
