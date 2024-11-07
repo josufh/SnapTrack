@@ -10,6 +10,105 @@
 
 #define REPO_PATH "."
 
+// Config
+typedef struct {
+    char name[255];
+    char email[255];
+    char userid[255];
+} User;
+
+#define CONFIG_ELEMENT_COUNT 3
+#define CONFIG_INITIAL_VALUE "name not_set\nemail not@set.com\nuserid 00000000\n"
+
+char *get_config_file_path() {
+    char *app_data_path = getenv("APPDATA");
+    if (!app_data_path) {
+        fprintf(stderr, "Error: APPDATA environment variable not found\n");
+        exit(EXIT_FAILURE);
+    }
+
+    char config_path[PATH_SIZE];
+    snprintf(config_path, PATH_SIZE, "%s\\SnapTrack", app_data_path);
+    char *config_file_path = (char *)malloc(PATH_SIZE);
+    snprintf(config_file_path, PATH_SIZE, "%s\\config", config_path);
+    
+    if (!does_dir_exist(config_path)) {
+        _mkdir(config_path);
+        FILE *config_file = file_open(config_file_path, "w");
+        fputs(CONFIG_INITIAL_VALUE, config_file);
+        fclose(config_file);
+    }
+
+    return config_file_path;
+}
+
+void set_config(const char* element, const char *new_value) {
+    char *config_file_path = get_config_file_path();
+    FILE *config_file = file_open(config_file_path, "r");
+
+    char lines[CONFIG_ELEMENT_COUNT][255] = {0};
+    int line_count = 0;
+    if (config_file) {
+        while (fgets(lines[line_count], 255, config_file)) {
+            char key[255], old_value[255];
+            sscanf(lines[line_count], "%s %s", key, old_value);
+            if (strcmp(key, element) == 0) {
+                snprintf(lines[line_count], 255, "%s %s\n", key, new_value);
+            }
+            line_count++;
+        }
+        fclose(config_file);
+    }
+
+    config_file = file_open(config_file_path, "w");
+    for (int i = 0; i < line_count; i++) {
+        fputs(lines[i], config_file);
+    }
+    fclose(config_file);
+    free(config_file_path);
+}
+
+void get_config(const char* element) {
+    char *config_file_path = get_config_file_path();
+    FILE *config_file = file_open(config_file_path, "r");
+
+    char line[255] = {0};
+    if (config_file) {
+        while (fgets(line, 255, config_file)) {
+            char key[255], value[255];
+            sscanf(line, "%s %s", key, value);
+            if (strcmp(key, element) == 0) {
+                fprintf(stdout, "\t%s = %s\n", element, value);
+                break;
+            }
+        }
+        fclose(config_file);
+    }
+    free(config_file_path);
+}
+
+void get_user_info(User *user) {
+    char *config_file_path = get_config_file_path();
+    FILE *config_file = file_open(config_file_path, "r");
+
+    char line[255] = {0};
+    if (config_file) {
+        while (fgets(line, 255, config_file)) {
+            char key[255], value[255];
+            sscanf(line, "%s %s", key, value);
+            if (strcmp(key, "name") == 0) {
+                strcpy(user->name, value);
+            } else if (strcmp(key, "email") == 0) {
+                strcpy(user->email, value);
+            } else if (strcmp(key, "userid") == 0) {
+                strcpy(user->userid, value);
+            }
+        }
+        fclose(config_file);
+    }
+    free(config_file_path);
+}
+
 // Command check
 typedef enum {
     Init = 0,
@@ -233,12 +332,15 @@ void check_status(const char *repo_path) {
 typedef struct {
     char index_hash[SHA1_BLOCK_SIZE*2+1];
     char parent[SHA1_BLOCK_SIZE*2+1];
-    char author[256];
+    char author_name[256];
+    char author_email[256];
+    char author_userid[256];
     char message[512];
     time_t timestamp;
 } Commit;
 
 void commit_changes(const char *commit_message) {
+    repo_must_exist(REPO_PATH);
     Commit commit = {0};
 
     DLL sha1_dll;
@@ -285,8 +387,13 @@ void commit_changes(const char *commit_message) {
 
     strncpy(commit.parent, last_commit, sizeof(commit.parent));
 
-    // Get author
-    strcpy(commit.author, "not yet implemented");
+    // Get user info
+    User user = {0};
+    get_user_info(&user);
+
+    strcpy(commit.author_name, user.name);
+    strcpy(commit.author_email, user.email);
+    strcpy(commit.author_userid, user.userid);
 
     // Get message
     strncpy(commit.message, commit_message, sizeof(commit.message));
@@ -297,8 +404,8 @@ void commit_changes(const char *commit_message) {
     // Get this commit hash and store
     char commit_content[1024];
     snprintf(commit_content, sizeof(commit_content),
-                "index %s\nparent %s\nauthor %s\ndate %ld\n\n%s",
-                commit.index_hash, commit.parent, commit.author,
+                "index %s\nparent %s\nauthor\n\t%s\n\t%s\n\t%s\ndate %ld\n\n%s",
+                commit.index_hash, commit.parent, commit.author_name, commit.author_email, commit.author_userid,
                 commit.timestamp, commit.message);
     
     File temp_commit = {0};
@@ -326,87 +433,4 @@ void commit_changes(const char *commit_message) {
 
     remove(temp_commit.path);
     free_library(&sha1_dll);
-}
-
-// Config
-#define CONFIG_ELEMENT_COUNT 3
-#define CONFIG_INITIAL_VALUE "name not_set\nemail not@set.com\nuserid 00000000\n"
-
-void set_config(const char* element, const char *new_value) {
-    char *app_data_path = getenv("APPDATA");
-    if (!app_data_path) {
-        fprintf(stderr, "Error: APPDATA environment variable not found\n");
-        exit(EXIT_FAILURE);
-    }
-
-    char config_path[PATH_SIZE];
-    snprintf(config_path, PATH_SIZE, "%s\\SnapTrack", app_data_path);
-    char config_file_path[PATH_SIZE];
-    snprintf(config_file_path, PATH_SIZE, "%s\\config", config_path);
-    
-    if (!does_dir_exist(config_path)) {
-        _mkdir(config_path);
-        FILE *config_file = file_open(config_file_path, "w");
-        fputs(CONFIG_INITIAL_VALUE, config_file);
-        fclose(config_file);
-    }
-
-    FILE *config_file = file_open(config_file_path, "r");
-
-    char lines[CONFIG_ELEMENT_COUNT][255] = {0};
-    int line_count = 0;
-    if (config_file) {
-        while (fgets(lines[line_count], 255, config_file)) {
-            char key[255], old_value[255];
-            sscanf(lines[line_count], "%s %s", key, old_value);
-            if (strcmp(key, element) == 0) {
-                snprintf(lines[line_count], 255, "%s %s\n", key, new_value);
-            }
-            line_count++;
-        }
-        fclose(config_file);
-    }
-
-    config_file = file_open(config_file_path, "w");
-    for (int i = 0; i < line_count; i++) {
-        fputs(lines[i], config_file);
-    }
-    fclose(config_file);
-}
-
-void get_config(const char* element) {
-    char *app_data_path = getenv("APPDATA");
-    if (!app_data_path) {
-        fprintf(stderr, "Error: APPDATA environment variable not found\n");
-        exit(EXIT_FAILURE);
-    }
-
-    char config_path[PATH_SIZE];
-    snprintf(config_path, PATH_SIZE, "%s\\SnapTrack", app_data_path);
-    char config_file_path[PATH_SIZE];
-    snprintf(config_file_path, PATH_SIZE, "%s\\config", config_path);
-    
-    if (!does_dir_exist(config_path)) {
-        _mkdir(config_path);
-        FILE *config_file = file_open(config_file_path, "w");
-        fputs(CONFIG_INITIAL_VALUE, config_file);
-        fclose(config_file);
-    }
-
-    FILE *config_file = file_open(config_file_path, "r");
-
-    char lines[CONFIG_ELEMENT_COUNT][255] = {0};
-    int line_count = 0;
-    if (config_file) {
-        while (fgets(lines[line_count], 255, config_file)) {
-            char key[255], old_value[255];
-            sscanf(lines[line_count], "%s %s", key, old_value);
-            if (strcmp(key, element) == 0) {
-                fprintf(stdout, "\t%s = %s\n", element, old_value);
-                break;
-            }
-            line_count++;
-        }
-        fclose(config_file);
-    }
 }
