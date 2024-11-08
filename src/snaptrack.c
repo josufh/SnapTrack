@@ -5,37 +5,18 @@
 #include <windows.h>
 #include <dirent.h>
 #include <time.h>
-#include "file.h" 
-#include "stringutils.c"
-#include "config.c"
+#include "file.h"
+#include "config.h"
+#include "snaptrack.h"
 
-// SHA1
-typedef void (*SHA1FileFunc)(const char *filename, unsigned char hash[SHA1_BLOCK_SIZE]);
-
-typedef struct {
-    HMODULE handle;
-    void *func;
-} DLL;
-
-void load_library(DLL *dll, const char *dll_path) {
-    dll->handle = LoadLibrary(dll_path);
-    if (!dll->handle) {
-        fprintf(stderr, "Failed to load %s\n", dll_path);
-        exit(EXIT_FAILURE);
-    }
-}
-
-void load_function(DLL *dll, const char *function_name) {
-    dll->func = (void *)GetProcAddress(dll->handle, function_name);
-    if (!dll->func) {
-        fprintf(stderr, "Failed to locate %s in DLL", function_name);
-        FreeLibrary(dll->handle);
-        exit(EXIT_FAILURE);
-    }
-}
-
-void free_library(DLL *dll) {
-    FreeLibrary(dll->handle);
+Command which_command(const char *command) {
+    if (is_same_string(command, "init")) return Init;
+    else if (is_same_string(command, "status")) return Status;
+    else if (is_same_string(command, "stage")) return Stage;
+    else if (is_same_string(command, "commit")) return CommitChanges;
+    else if (is_same_string(command, "config")) return Config;
+    else if (is_same_string(command, "revert")) return Revert;
+    else return UnknownCommand;
 }
 
 // Init
@@ -52,52 +33,11 @@ void init_repository(const char *repo_path) {
     fprintf(stdout, "Initialized local empty SnapTrack repository\n");
 }
 
-// Stage
-void stage_files(const char *repo_path) {
-    repo_must_exist(repo_path);
-
-    DLL sha1_dll;
-    load_library(&sha1_dll, "sha1.dll");
-    load_function(&sha1_dll, "sha1_file");
-    SHA1FileFunc sha1_file = (SHA1FileFunc)sha1_dll.func;
-
-    Files repo_files = {0};
-    get_repo_files(repo_path, &repo_files, ".snaptrackignore");
-
-    for (int i = 0; i < repo_files.count; i++) {
-        unsigned char hash[SHA1_BLOCK_SIZE];
-        sha1_file(repo_files.items[i].path, hash);
-        sha1_to_hex(hash, repo_files.items[i].hash);
-    }
-
-    char index_path[MAX_PATH];
-    char temp_path[MAX_PATH];
-    snprintf(index_path, sizeof(index_path), "%s\\.snaptrack\\index", repo_path);
-    snprintf(temp_path, sizeof(temp_path), "%s\\.snaptrack\\temp_index", repo_path);
-    FILE *index_file = file_open(index_path, "r");
-    
-    Files staged_files = {0};
-    char line[1024];
-    while (fgets(line, sizeof(line), index_file)) {
-        File *new_items = realloc(staged_files.items, (staged_files.count+1)*sizeof(File));
-        if (!new_items) {
-            fprintf(stderr, "Failed to allocate memory\n");
-            exit(EXIT_FAILURE);
-        }
-        staged_files.items = new_items;
-
-        sscanf(line, "%s %s", staged_files.items[staged_files.count].path, staged_files.items[staged_files.count].hash);
-        staged_files.items[staged_files.count].status = Deleted;
-        staged_files.count++;
-    }
-
-    fclose(index_file);
-
-
-    for (int i = 0; i < staged_files.count; i++) {
-        File *filei = &staged_files.items[i];
-        for (int j = 0; j < repo_files.count; j++) {
-            File *filer = &repo_files.items[j];
+void compare_repo_index(Files *staged_files, Files *repo_files) {
+    for (int i = 0; i < staged_files->count; i++) {
+        File *filei = get_file_at_index(*staged_files, i);
+        for (int j = 0; j < repo_files->count; j++) {
+            File *filer = get_file_at_index(*repo_files, j);
             if (is_same_string(filei->path, filer->path)) {
                 if (is_same_string(filei->hash, filer->hash)) {
                     filei->status = Staged;
@@ -110,12 +50,41 @@ void stage_files(const char *repo_path) {
             }
         }
     }
+}
+
+// Stage
+void stage_files(const char *repo_path) {
+    repo_must_exist(repo_path);
+
+    DLL sha1_dll;
+    load_function(&sha1_dll, "sha1.dll", "sha1_file");
+    SHA1FileFunc sha1_file = (SHA1FileFunc)sha1_dll.func;
+
+    Files repo_files = {0};
+    get_repo_files(repo_path, &repo_files, ".snaptrackignore");
+
+    for (int i = 0; i < repo_files.count; i++) {
+        unsigned char hash[SHA1_BLOCK_SIZE];
+        File *file = get_file_at_index(repo_files, i);
+        sha1_file(file->path, hash);
+        sha1_to_hex(hash, file->hash);
+    }
+
+    char index_path[MAX_PATH];
+    char temp_path[MAX_PATH];
+    snprintf(index_path, MAX_PATH, "%s\\.snaptrack\\index", REPO_PATH);
+    snprintf(temp_path, MAX_PATH, "%s\\.snaptrack\\temp_index", REPO_PATH);
+
+    Files staged_files = {0};
+    get_index_files(index_path, &staged_files, Deleted);
+
+    compare_repo_index(&staged_files, &repo_files);
 
     char object_path[MAX_PATH];
     FILE *temp_file = file_open(temp_path, "w");
 
     for (int i = 0; i < repo_files.count; i++) {
-        File file = repo_files.items[i];
+        File file = *get_file_at_index(repo_files, i);
         if (file.status == Modified || file.status == New) {
             snprintf(object_path, MAX_PATH, "%s\\.snaptrack\\objects\\%s", repo_path, file.hash);
             FILE *object_file = file_open(object_path, "wb");
@@ -147,56 +116,27 @@ void stage_files(const char *repo_path) {
 void check_status() {
     repo_must_exist(REPO_PATH);
 
+    DLL sha1_dll;
+    load_function(&sha1_dll, "sha1.dll", "sha1_file");
+    SHA1FileFunc sha1_file = (SHA1FileFunc)sha1_dll.func;
+
     char index_path[MAX_PATH];
     snprintf(index_path, sizeof(index_path), "%s\\.snaptrack\\index", REPO_PATH);
 
-    FILE *index_file = file_open(index_path, "r");
-
-    DLL sha1_dll;
-    load_library(&sha1_dll, "sha1.dll");
-    load_function(&sha1_dll, "sha1_file");
-    SHA1FileFunc sha1_file = (SHA1FileFunc)sha1_dll.func;
-
     Files staged_files = {0};
-    char line[1024];
-    while (fgets(line, sizeof(line), index_file)) {
-        File *new_items = realloc(staged_files.items, (staged_files.count+1)*sizeof(File));
-        if (!new_items) {
-            fprintf(stderr, "Failed to allocate memory\n");
-            exit(EXIT_FAILURE);
-        }
-        staged_files.items = new_items;
-
-        sscanf(line, "%s %s", staged_files.items[staged_files.count].path, staged_files.items[staged_files.count].hash);
-        staged_files.items[staged_files.count].status = Deleted;
-        staged_files.count++;
-    }
+    get_index_files(index_path, &staged_files, Deleted);
 
     Files repo_files = {0};
     get_repo_files(REPO_PATH, &repo_files, ".snaptrackignore");
 
     for (int i = 0; i < repo_files.count; i++) {
         unsigned char hash[SHA1_BLOCK_SIZE];
-        sha1_file(repo_files.items[i].path, hash);
-        sha1_to_hex(hash, repo_files.items[i].hash);
+        File *file = get_file_at_index(repo_files, i);
+        sha1_file(file->path, hash);
+        sha1_to_hex(hash, file->hash);
     }
 
-    for (int i = 0; i < staged_files.count; i++) {
-        File *filei = &staged_files.items[i];
-        for (int j = 0; j < repo_files.count; j++) {
-            File *filer = &repo_files.items[j];
-            if (is_same_string(filei->path, filer->path)) {
-                if (is_same_string(filei->hash, filer->hash)) {
-                    filei->status = Staged;
-                    filer->status = Staged;
-                    break;
-                }
-                filei->status = Modified;
-                filer->status = Modified;
-                break;
-            }
-        }
-    }
+    compare_repo_index(&staged_files, &repo_files);
 
     print_files_by_status(staged_files, Modified);
     print_files_by_status(repo_files, New);
@@ -206,35 +146,22 @@ void check_status() {
     free_files(&repo_files);
 
     free_library(&sha1_dll);
-    fclose(index_file);
 }
 
 // Commit
-typedef struct {
-    char index_hash[SHA1_BLOCK_SIZE*2+1];
-    char parent[SHA1_BLOCK_SIZE*2+1];
-    char hash[SHA1_BLOCK_SIZE*2+1];
-    char author_name[256];
-    char author_email[256];
-    char author_userid[256];
-    char message[512];
-    time_t timestamp;
-} Commit;
-
 void commit_changes(const char *commit_message) {
     repo_must_exist(REPO_PATH);
     Commit commit = {0};
 
     DLL sha1_dll;
-    load_library(&sha1_dll, "sha1.dll");
-    load_function(&sha1_dll, "sha1_file");
+    load_function(&sha1_dll, "sha1.dll", "sha1_file");
     SHA1FileFunc sha1_file = (SHA1FileFunc)sha1_dll.func;
 
     // Get index file hash and store object
     File index_file = {0};
     snprintf(index_file.path, MAX_PATH, "%s\\.snaptrack\\index", REPO_PATH);
     
-    char index_hash[SHA1_BLOCK_SIZE*2+1];
+    char index_hash[SHA1_STRING_SIZE];
     unsigned char hash[SHA1_BLOCK_SIZE];
     sha1_file(index_file.path, hash);
     sha1_to_hex(hash, index_file.hash);
@@ -264,7 +191,7 @@ void commit_changes(const char *commit_message) {
     char current_branch_path[MAX_PATH];
     snprintf(current_branch_path, MAX_PATH, "%s\\.snaptrack\\%s", REPO_PATH, branch_path);
     FILE *current_branch_file = file_open(current_branch_path, "r");
-    char last_commit[SHA1_BLOCK_SIZE*2+1] = {0};
+    char last_commit[SHA1_STRING_SIZE] = {0};
     fgets(last_commit, sizeof(last_commit), current_branch_file);
 
     strncpy(commit.parent, last_commit, sizeof(commit.parent));
@@ -362,7 +289,7 @@ void list_commits() {
     char current_branch_path[MAX_PATH];
     snprintf(current_branch_path, MAX_PATH, "%s\\.snaptrack\\%s", REPO_PATH, branch_path);
     FILE *current_branch_file = file_open(current_branch_path, "r");
-    char last_commit_hash[SHA1_BLOCK_SIZE*2+1] = {0};
+    char last_commit_hash[SHA1_STRING_SIZE] = {0};
     fgets(last_commit_hash, sizeof(last_commit_hash), current_branch_file);
 
     while (strcmp(last_commit_hash, "") != 0) {
@@ -387,8 +314,7 @@ void list_commits() {
 // Revert commit
 void revert_commit(const char *revert_hash) {
     DLL sha1_dll;
-    load_library(&sha1_dll, "sha1.dll");
-    load_function(&sha1_dll, "sha1_file");
+    load_function(&sha1_dll, "sha1.dll", "sha1_file");
     SHA1FileFunc sha1_file = (SHA1FileFunc)sha1_dll.func;
 
     Commit revert_commit = {0};
@@ -396,37 +322,25 @@ void revert_commit(const char *revert_hash) {
 
     char revert_index_blob_path[MAX_PATH] = {0};
     snprintf(revert_index_blob_path, MAX_PATH, "%s\\.snaptrack\\objects\\%s", REPO_PATH, revert_commit.index_hash);
-    FILE *revert_index_file = file_open(revert_index_blob_path, "r");
-
     Files revert_files = {0};
-    char line[512];
-    while (fgets(line, 512, revert_index_file)) {
-        File *new_items = realloc(revert_files.items, (revert_files.count+1)*sizeof(File));
-        if (!new_items) {
-            fprintf(stderr, "Failed to allocate memory\n");
-            exit(EXIT_FAILURE);
-        }
-        revert_files.items = new_items;
-
-        sscanf(line, "%s %s", revert_files.items[revert_files.count].path, revert_files.items[revert_files.count].hash);
-        // file status?
-        revert_files.count++;
-    }
+    get_index_files(revert_index_blob_path, &revert_files, Staged);
 
     Files repo_files = {0};
     get_repo_files(REPO_PATH, &repo_files, ".snaptrackignore");
 
     for (int i = 0; i < repo_files.count; i++) {
         unsigned char hash[SHA1_BLOCK_SIZE];
-        sha1_file(repo_files.items[i].path, hash);
-        sha1_to_hex(hash, repo_files.items[i].hash);
+        File *file = get_file_at_index(repo_files, i);
+        sha1_file(file->path, hash);
+        sha1_to_hex(hash, file->hash);
     }
 
     for (int i = 0; i < revert_files.count; i++) {
+        File *revert_file = get_file_at_index(revert_files, i);
         char blob_path[MAX_PATH];
-        snprintf(blob_path, MAX_PATH, "%s\\.snaptrack\\objects\\%s", REPO_PATH, revert_files.items[i].hash);
+        snprintf(blob_path, MAX_PATH, "%s\\.snaptrack\\objects\\%s", REPO_PATH, revert_file->hash);
         FILE *read = file_open(blob_path, "r");
-        FILE *write = file_open(revert_files.items[i].path, "w");
+        FILE *write = file_open(revert_file->path, "w");
 
         char buffer[1024];
         size_t bytes;
@@ -438,16 +352,18 @@ void revert_commit(const char *revert_hash) {
         fclose(read); fclose(write);
 
         for (int j = 0; j < repo_files.count; j++) {
-            if (is_same_string(revert_files.items[i].path, repo_files.items[j].path)) {
-                repo_files.items[j].status = Staged;
+            File *repo_file = get_file_at_index(repo_files, j);
+            if (is_same_string(revert_file->path, repo_file->path)) {
+                repo_file->status = Staged;
                 break;
             }
         }
     }
 
     for (int i = 0; i < repo_files.count; i++) {
-        if (repo_files.items[i].status == New) {
-            remove(repo_files.items[i].path);
+        File *repo_file = get_file_at_index(repo_files, i);
+        if (repo_file->status == New) {
+            remove(repo_file->path);
         }
     }
 

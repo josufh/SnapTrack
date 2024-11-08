@@ -1,6 +1,6 @@
 #include <stdio.h>
-#include <windows.h>
 #include "snaptrack.h"
+#include "config.h"
 
 /*
 TODO asap

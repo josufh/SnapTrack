@@ -1,6 +1,8 @@
 #ifndef SNAPTRACK_H
 #define SNAPTRACK_H
 
+#include "file.h"
+
 typedef enum {
     Init = 0,
     Status,
@@ -11,14 +13,25 @@ typedef enum {
     UnknownCommand
 } Command;
 
-Command which_command(const char *command) {
-    if (is_same_string(command, "init")) return Init;
-    else if (is_same_string(command, "status")) return Status;
-    else if (is_same_string(command, "stage")) return Stage;
-    else if (is_same_string(command, "commit")) return CommitChanges;
-    else if (is_same_string(command, "config")) return Config;
-    else if (is_same_string(command, "revert")) return Revert;
-    else return UnknownCommand;
-}
+Command which_command(const char *command);
+void init_repository(const char *repo_path);
+void stage_files(const char *repo_path);
+void check_status();
+
+typedef struct {
+    char index_hash[SHA1_STRING_SIZE];
+    char parent[SHA1_STRING_SIZE];
+    char hash[SHA1_STRING_SIZE];
+    char author_name[256];
+    char author_email[256];
+    char author_userid[256];
+    char message[512];
+    time_t timestamp;
+} Commit;
+
+void commit_changes(const char *commit_message);
+void get_commit_info(Commit *commit, const char *commit_hash);
+void list_commits();
+void revert_commit(const char *revert_hash);
 
 #endif // SNAPTRACK_H

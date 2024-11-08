@@ -10,6 +10,7 @@
         "minwindef.h": "c",
         "dynamic_array.h": "c",
         "stdlib.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "ignore.h": "c"
     }
 }

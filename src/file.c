@@ -7,6 +7,39 @@
 #include "file.h"
 #include "ignore.h"
 
+void load_library(DLL *dll, const char *dll_path) {
+    dll->handle = LoadLibrary(dll_path);
+    if (!dll->handle) {
+        fprintf(stderr, "Failed to load %s\n", dll_path);
+        exit(EXIT_FAILURE);
+    }
+}
+
+void load_function(DLL *dll, const char *library_name, const char *function_name) {
+    load_library(dll, library_name);
+    dll->func = (void *)GetProcAddress(dll->handle, function_name);
+    if (!dll->func) {
+        fprintf(stderr, "Failed to locate %s in DLL", function_name);
+        FreeLibrary(dll->handle);
+        exit(EXIT_FAILURE);
+    }
+}
+
+void free_library(DLL *dll) {
+    FreeLibrary(dll->handle);
+}
+
+void sha1_to_hex(unsigned char hash[SHA1_BLOCK_SIZE], char output[SHA1_STRING_SIZE]) {
+    for (int i = 0; i < SHA1_BLOCK_SIZE; i++) {
+        sprintf(output + (i*2), "%02x", hash[i]);
+    }
+    output[SHA1_BLOCK_SIZE*2] = '\0';
+}
+
+int is_same_string(const char *string1, const char *string2) {
+    return strcmp(string1, string2) == 0;
+}
+
 File *get_file_at_index(Files files, size_t index) {
     return (File *)DA_GET(files, index);
 }
@@ -38,7 +71,7 @@ FILE *file_open(const char* filepath, const char* mode) {
 }
 
 void free_files(Files *files) {
-    free(files->items);
+    DA_FREE(*files);
 }
 
 void get_repo_files(const char *path, Files *repo_files, const char *ignore_file_path) {
@@ -84,6 +117,21 @@ void get_repo_files(const char *path, Files *repo_files, const char *ignore_file
     FindClose(hFind);
 
     DA_FREE(ignore_patterns);
+}
+
+void get_index_files(const char *index_path, Files *index_files, FileStatus status) {
+    FILE *index_file = file_open(index_path, "r");
+    
+    char line[MAX_PATH];
+    while (fgets(line, MAX_PATH, index_file)) {
+        File new_file = {0};
+        sscanf(line, "%s %s", new_file.path, new_file.hash);
+        new_file.status = status;
+        
+        DA_ADD(*index_files, &new_file);
+    }
+
+    fclose(index_file);
 }
 
 int does_dir_exist(const char *path) {
