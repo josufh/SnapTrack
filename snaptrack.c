@@ -13,6 +13,7 @@ snapshot clean (clean blobs that arent used, clean after commit)
 revert -soft -hard?
 no revert if last commit
 refactor......
+release
 
 */
 

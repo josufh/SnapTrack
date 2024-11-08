@@ -7,107 +7,9 @@
 #include <time.h>
 #include "fileutils.c"
 #include "stringutils.c"
+#include "config.c"
 
 #define REPO_PATH "."
-
-// Config
-typedef struct {
-    char name[255];
-    char email[255];
-    char userid[255];
-} User;
-
-#define CONFIG_ELEMENT_COUNT 3
-#define CONFIG_INITIAL_VALUE "name not_set\nemail not@set.com\nuserid 00000000\n"
-
-char *get_config_file_path() {
-    char *app_data_path = getenv("APPDATA");
-    if (!app_data_path) {
-        fprintf(stderr, "Error: APPDATA environment variable not found\n");
-        exit(EXIT_FAILURE);
-    }
-
-    char config_path[PATH_SIZE];
-    snprintf(config_path, PATH_SIZE, "%s\\SnapTrack", app_data_path);
-    char *config_file_path = (char *)malloc(PATH_SIZE);
-    snprintf(config_file_path, PATH_SIZE, "%s\\config", config_path);
-    
-    if (!does_dir_exist(config_path)) {
-        _mkdir(config_path);
-        FILE *config_file = file_open(config_file_path, "w");
-        fputs(CONFIG_INITIAL_VALUE, config_file);
-        fclose(config_file);
-    }
-
-    return config_file_path;
-}
-
-void set_config(const char* element, const char *new_value) {
-    char *config_file_path = get_config_file_path();
-    FILE *config_file = file_open(config_file_path, "r");
-
-    char lines[CONFIG_ELEMENT_COUNT][255] = {0};
-    int line_count = 0;
-    if (config_file) {
-        while (fgets(lines[line_count], 255, config_file)) {
-            char key[255], old_value[255];
-            sscanf(lines[line_count], "%s %s", key, old_value);
-            if (strcmp(key, element) == 0) {
-                snprintf(lines[line_count], 255, "%s %s\n", key, new_value);
-            }
-            line_count++;
-        }
-        fclose(config_file);
-    }
-
-    config_file = file_open(config_file_path, "w");
-    for (int i = 0; i < line_count; i++) {
-        fputs(lines[i], config_file);
-    }
-    fclose(config_file);
-    free(config_file_path);
-}
-
-void get_config(const char* element) {
-    char *config_file_path = get_config_file_path();
-    FILE *config_file = file_open(config_file_path, "r");
-
-    char line[255] = {0};
-    if (config_file) {
-        while (fgets(line, 255, config_file)) {
-            char key[255], value[255];
-            sscanf(line, "%s %s", key, value);
-            if (strcmp(key, element) == 0) {
-                fprintf(stdout, "\t%s = %s\n", element, value);
-                break;
-            }
-        }
-        fclose(config_file);
-    }
-    free(config_file_path);
-}
-
-void get_user_info(User *user) {
-    char *config_file_path = get_config_file_path();
-    FILE *config_file = file_open(config_file_path, "r");
-
-    char line[255] = {0};
-    if (config_file) {
-        while (fgets(line, 255, config_file)) {
-            char key[255], value[255];
-            sscanf(line, "%s %s", key, value);
-            if (strcmp(key, "name") == 0) {
-                strcpy(user->name, value);
-            } else if (strcmp(key, "email") == 0) {
-                strcpy(user->email, value);
-            } else if (strcmp(key, "userid") == 0) {
-                strcpy(user->userid, value);
-            }
-        }
-        fclose(config_file);
-    }
-    free(config_file_path);
-}
 
 // Command check
 typedef enum {
@@ -191,8 +93,8 @@ void stage_files(const char *repo_path) {
         sha1_to_hex(hash, repo_files.items[i].hash);
     }
 
-    char index_path[PATH_SIZE];
-    char temp_path[PATH_SIZE];
+    char index_path[MAX_PATH];
+    char temp_path[MAX_PATH];
     snprintf(index_path, sizeof(index_path), "%s\\.snaptrack\\index", repo_path);
     snprintf(temp_path, sizeof(temp_path), "%s\\.snaptrack\\temp_index", repo_path);
     FILE *index_file = file_open(index_path, "r");
@@ -232,13 +134,13 @@ void stage_files(const char *repo_path) {
         }
     }
 
-    char object_path[PATH_SIZE];
+    char object_path[MAX_PATH];
     FILE *temp_file = file_open(temp_path, "w");
 
     for (int i = 0; i < repo_files.count; i++) {
         File file = repo_files.items[i];
         if (file.status == Modified || file.status == New) {
-            snprintf(object_path, PATH_SIZE, "%s\\.snaptrack\\objects\\%s", repo_path, file.hash);
+            snprintf(object_path, MAX_PATH, "%s\\.snaptrack\\objects\\%s", repo_path, file.hash);
             FILE *object_file = file_open(object_path, "wb");
             FILE *src_file = file_open(file.path, "rb");
 
@@ -268,7 +170,7 @@ void stage_files(const char *repo_path) {
 void check_status(const char *repo_path) {
     repo_must_exist(repo_path);
 
-    char index_path[PATH_SIZE];
+    char index_path[MAX_PATH];
     snprintf(index_path, sizeof(index_path), "%s\\.snaptrack\\index", repo_path);
 
     FILE *index_file = file_open(index_path, "r");
@@ -353,7 +255,7 @@ void commit_changes(const char *commit_message) {
 
     // Get index file hash and store object
     File index_file = {0};
-    snprintf(index_file.path, PATH_SIZE, "%s\\.snaptrack\\index", REPO_PATH);
+    snprintf(index_file.path, MAX_PATH, "%s\\.snaptrack\\index", REPO_PATH);
     
     char index_hash[SHA1_BLOCK_SIZE*2+1];
     unsigned char hash[SHA1_BLOCK_SIZE];
@@ -362,8 +264,8 @@ void commit_changes(const char *commit_message) {
 
     strncpy(commit.index_hash, index_file.hash, sizeof(index_file.hash));
 
-    char object_path[PATH_SIZE];
-    snprintf(object_path, PATH_SIZE, "%s\\.snaptrack\\objects\\%s", REPO_PATH, index_file.hash);
+    char object_path[MAX_PATH];
+    snprintf(object_path, MAX_PATH, "%s\\.snaptrack\\objects\\%s", REPO_PATH, index_file.hash);
     FILE *object_file = file_open(object_path, "wb");
     FILE *src_file = file_open(index_file.path, "rb");
 
@@ -375,15 +277,15 @@ void commit_changes(const char *commit_message) {
     fclose(object_file); fclose(src_file);
 
     // Get last commit hash
-    char head_path[PATH_SIZE];
-    snprintf(head_path, PATH_SIZE, "%s\\.snaptrack\\HEAD", REPO_PATH);
+    char head_path[MAX_PATH];
+    snprintf(head_path, MAX_PATH, "%s\\.snaptrack\\HEAD", REPO_PATH);
     FILE *head_file = file_open(head_path, "r");
-    char branch_path[PATH_SIZE];
-    fgets(branch_path, PATH_SIZE, head_file);
+    char branch_path[MAX_PATH];
+    fgets(branch_path, MAX_PATH, head_file);
     fclose(head_file);
 
-    char current_branch_path[PATH_SIZE];
-    snprintf(current_branch_path, PATH_SIZE, "%s\\.snaptrack\\%s", REPO_PATH, branch_path);
+    char current_branch_path[MAX_PATH];
+    snprintf(current_branch_path, MAX_PATH, "%s\\.snaptrack\\%s", REPO_PATH, branch_path);
     FILE *current_branch_file = file_open(current_branch_path, "r");
     char last_commit[SHA1_BLOCK_SIZE*2+1] = {0};
     fgets(last_commit, sizeof(last_commit), current_branch_file);
@@ -412,7 +314,7 @@ void commit_changes(const char *commit_message) {
                 commit.timestamp, commit.message);
     
     File temp_commit = {0};
-    snprintf(temp_commit.path, PATH_SIZE, "%s\\.snaptrack\\temp_commit", REPO_PATH);
+    snprintf(temp_commit.path, MAX_PATH, "%s\\.snaptrack\\temp_commit", REPO_PATH);
     FILE *temp_commit_file = file_open(temp_commit.path, "w");
     fprintf(temp_commit_file, "%s", commit_content);
     fclose(temp_commit_file);
@@ -420,7 +322,7 @@ void commit_changes(const char *commit_message) {
     sha1_file(temp_commit.path, hash);
     sha1_to_hex(hash, temp_commit.hash);
     
-    snprintf(object_path, PATH_SIZE, "%s\\.snaptrack\\objects\\%s", REPO_PATH, temp_commit.hash);
+    snprintf(object_path, MAX_PATH, "%s\\.snaptrack\\objects\\%s", REPO_PATH, temp_commit.hash);
     object_file = file_open(object_path, "wb");
     src_file = file_open(temp_commit.path, "rb");
 
@@ -439,8 +341,8 @@ void commit_changes(const char *commit_message) {
 }
 
 void get_commit_info(Commit *commit, const char *commit_hash) {
-    char object_path[PATH_SIZE];
-    snprintf(object_path, PATH_SIZE, "%s\\.snaptrack\\objects\\%s", REPO_PATH, commit_hash);
+    char object_path[MAX_PATH];
+    snprintf(object_path, MAX_PATH, "%s\\.snaptrack\\objects\\%s", REPO_PATH, commit_hash);
     FILE *object_file = file_open(object_path, "rb");
 
     // get hash
@@ -473,15 +375,15 @@ void list_commits() {
     int commit_count = 0;
 
     // Get last commit hash
-    char head_path[PATH_SIZE];
-    snprintf(head_path, PATH_SIZE, "%s\\.snaptrack\\HEAD", REPO_PATH);
+    char head_path[MAX_PATH];
+    snprintf(head_path, MAX_PATH, "%s\\.snaptrack\\HEAD", REPO_PATH);
     FILE *head_file = file_open(head_path, "r");
-    char branch_path[PATH_SIZE];
-    fgets(branch_path, PATH_SIZE, head_file);
+    char branch_path[MAX_PATH];
+    fgets(branch_path, MAX_PATH, head_file);
     fclose(head_file);
 
-    char current_branch_path[PATH_SIZE];
-    snprintf(current_branch_path, PATH_SIZE, "%s\\.snaptrack\\%s", REPO_PATH, branch_path);
+    char current_branch_path[MAX_PATH];
+    snprintf(current_branch_path, MAX_PATH, "%s\\.snaptrack\\%s", REPO_PATH, branch_path);
     FILE *current_branch_file = file_open(current_branch_path, "r");
     char last_commit_hash[SHA1_BLOCK_SIZE*2+1] = {0};
     fgets(last_commit_hash, sizeof(last_commit_hash), current_branch_file);
@@ -515,8 +417,8 @@ void revert_commit(const char *revert_hash) {
     Commit revert_commit = {0};
     get_commit_info(&revert_commit, revert_hash);
 
-    char revert_index_blob_path[PATH_SIZE] = {0};
-    snprintf(revert_index_blob_path, PATH_SIZE, "%s\\.snaptrack\\objects\\%s", REPO_PATH, revert_commit.index_hash);
+    char revert_index_blob_path[MAX_PATH] = {0};
+    snprintf(revert_index_blob_path, MAX_PATH, "%s\\.snaptrack\\objects\\%s", REPO_PATH, revert_commit.index_hash);
     FILE *revert_index_file = file_open(revert_index_blob_path, "r");
 
     Files revert_files = {0};
@@ -544,8 +446,8 @@ void revert_commit(const char *revert_hash) {
     }
 
     for (int i = 0; i < revert_files.count; i++) {
-        char blob_path[PATH_SIZE];
-        snprintf(blob_path, PATH_SIZE, "%s\\.snaptrack\\objects\\%s", REPO_PATH, revert_files.items[i].hash);
+        char blob_path[MAX_PATH];
+        snprintf(blob_path, MAX_PATH, "%s\\.snaptrack\\objects\\%s", REPO_PATH, revert_files.items[i].hash);
         FILE *read = file_open(blob_path, "r");
         FILE *write = file_open(revert_files.items[i].path, "w");
 

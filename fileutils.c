@@ -9,7 +9,6 @@
 #include <errno.h>
 
 #define SHA1_BLOCK_SIZE 20
-#define PATH_SIZE MAX_PATH
 
 typedef enum {
     Staged = 0,
@@ -19,7 +18,7 @@ typedef enum {
 } FileStatus;
 
 typedef struct {
-    char path[PATH_SIZE];
+    char path[MAX_PATH];
     char hash[SHA1_BLOCK_SIZE*2+1];
     FileStatus status;
 } File;
@@ -84,11 +83,11 @@ int should_ignore(const char *filename, char **ignore_patterns, int ignore_count
     for (int i = 0; i < ignore_count; i++) {
         int pattern_is_directory = ignore_patterns[i][strlen(ignore_patterns[i])-1] == '\\';
         
-        char full_pattern[PATH_SIZE];
+        char full_pattern[MAX_PATH];
         if (is_directory) {
-            snprintf(full_pattern, PATH_SIZE, "%s\\", filename);
+            snprintf(full_pattern, MAX_PATH, "%s\\", filename);
         } else {
-            strncpy(full_pattern, filename, PATH_SIZE);
+            strncpy(full_pattern, filename, MAX_PATH);
         }
         
         if (is_directory && !pattern_is_directory) continue;
@@ -127,8 +126,8 @@ void get_repo_files(const char *path, Files *repo_files, const char *ignore_file
     WIN32_FIND_DATA find_data;
     HANDLE hFind;
 
-    char search_path[PATH_SIZE];
-    snprintf(search_path, PATH_SIZE, "%s\\*", path);
+    char search_path[MAX_PATH];
+    snprintf(search_path, MAX_PATH, "%s\\*", path);
 
     hFind = FindFirstFile(search_path, &find_data);
     if (hFind == INVALID_HANDLE_VALUE) {
@@ -140,8 +139,8 @@ void get_repo_files(const char *path, Files *repo_files, const char *ignore_file
         if (strcmp(find_data.cFileName, ".") == 0 || strcmp(find_data.cFileName, "..") == 0)
             continue;
         
-        char full_path[PATH_SIZE];
-        snprintf(full_path, PATH_SIZE, "%s\\%s", path, find_data.cFileName);
+        char full_path[MAX_PATH];
+        snprintf(full_path, MAX_PATH, "%s\\%s", path, find_data.cFileName);
         char *relative_path = _strdup(full_path+2);
 
         int is_directory = (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
@@ -173,7 +172,7 @@ void get_repo_files(const char *path, Files *repo_files, const char *ignore_file
 }
 
 void check_repo_already_exists(const char *repo_path) {
-    char path[PATH_SIZE];
+    char path[MAX_PATH];
     snprintf(path, sizeof(path), "%s\\.snaptrack", repo_path);
     if (_access(path, 0) == 0) {
         fprintf(stderr, "A SnapTrack repository already exists at this location.\n");
@@ -182,7 +181,7 @@ void check_repo_already_exists(const char *repo_path) {
 }
 
 void repo_must_exist(const char *repo_path) {
-    char path[PATH_SIZE];
+    char path[MAX_PATH];
     snprintf(path, sizeof(path), "%s\\.snaptrack", repo_path);
     if (_access(path, 0) != 0) {
         fprintf(stderr, "A SnapTrack repository doesn't exist at this location. Execute 'snaptrack init' before continuing.\n");
@@ -195,7 +194,7 @@ int does_dir_exist(const char *path) {
 }
 
 void make_directory(const char *repo_path, const char *subdir) {
-    char path[PATH_SIZE];
+    char path[MAX_PATH];
     snprintf(path, sizeof(path), "%s\\.snaptrack\\%s", repo_path, subdir);
     if (_mkdir(path) != 0 && errno != EEXIST) {
         fprintf(stderr, "Error at snaptrack init\n");
@@ -205,7 +204,7 @@ void make_directory(const char *repo_path, const char *subdir) {
 }
 
 void create_file(const char *repo_path, const char *subpath, const char *content) {
-    char path[PATH_SIZE];
+    char path[MAX_PATH];
     snprintf(path, sizeof(path), "%s\\.snaptrack\\%s", repo_path, subpath);
     FILE *file = fopen(path, "w");
     if (file == NULL) {
