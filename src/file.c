@@ -1,44 +1,24 @@
 #ifndef FILEUTILS
 #define FILEUTILS
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <windows.h>
-#include <direct.h>
-#include <errno.h>
+#include "file.h"
+#include "ignore.h"
 
-#define SHA1_BLOCK_SIZE 20
-
-typedef enum {
-    Staged = 0,
-    New,
-    Modified,
-    Deleted
-} FileStatus;
-
-typedef struct {
-    char path[MAX_PATH];
-    char hash[SHA1_BLOCK_SIZE*2+1];
-    FileStatus status;
-} File;
-
-typedef struct {
-    File *items;
-    int count;
-} Files;
-
-const char *file_status_string[] = {"Staged", "New", "Modified", "Deleted"};
+File *get_file_at_index(Files files, size_t index) {
+    return (File *)DA_GET(files, index);
+}
 
 void print_files_by_status(Files files, FileStatus status) {
     int print = 1;
     for (int i = 0; i < files.count; i++) {
-        if (files.items[i].status == status) {
+        File *file = get_file_at_index(files, i);
+        if (file->status == status) {
             if (print) {
                 print = 0;
                 fprintf(stdout, "%s files:\n", file_status_string[status]);
             }
-            fprintf(stdout, "\t%s\n", files.items[i].path);
+            fprintf(stdout, "\t%s\n", file->path);
         } 
     }
     if (!print) fprintf(stdout, "\n");
@@ -57,71 +37,9 @@ void free_files(Files *files) {
     free(files->items);
 }
 
-int wildcard_match(const char *pattern, const char *str) {
-    while (*pattern)
-    {
-        if (*pattern == '*') {
-            pattern++;
-            if (!*pattern) return 1;
-            while (*str)
-            {
-                if (wildcard_match(pattern, str)) return 1;
-                str++;
-            }
-            return 0;
-        } else if (*pattern == *str) {
-            pattern++;
-            str++;
-        } else {
-            return 0;
-        }
-    }
-    return *str == '\0';
-}
-
-int should_ignore(const char *filename, char **ignore_patterns, int ignore_count, int is_directory) {
-    for (int i = 0; i < ignore_count; i++) {
-        int pattern_is_directory = ignore_patterns[i][strlen(ignore_patterns[i])-1] == '\\';
-        
-        char full_pattern[MAX_PATH];
-        if (is_directory) {
-            snprintf(full_pattern, MAX_PATH, "%s\\", filename);
-        } else {
-            strncpy(full_pattern, filename, MAX_PATH);
-        }
-        
-        if (is_directory && !pattern_is_directory) continue;
-        if (!is_directory && pattern_is_directory) continue;
-
-        if (wildcard_match(ignore_patterns[i], full_pattern)) {
-            return 1;
-        }
-    }
-    return 0;
-}
-
-void load_ignore_patterns(const char *ignore_file_path, char ***ignore_patterns, int *ignore_count) {
-    FILE *file = fopen(ignore_file_path, "r");
-    if (!file) return;
-
-    char line[256];
-    while (fgets(line, sizeof(line), file)) {
-        line[strcspn(line, "\n")] = 0;
-        *ignore_patterns = realloc(*ignore_patterns, (*ignore_count + 1)*sizeof(char *));
-        (*ignore_patterns)[*ignore_count] = strdup(line);
-        (*ignore_count)++;
-    }
-    fclose(file);
-
-    *ignore_patterns = realloc(*ignore_patterns, (*ignore_count + 1)*sizeof(char *));
-    (*ignore_patterns)[*ignore_count] = strdup(".snaptrack\\");
-    (*ignore_count)++;
-}
-
 void get_repo_files(const char *path, Files *repo_files, const char *ignore_file_path) {
-    char **ignore_patterns = NULL;
-    int ignore_count = 0;
-    load_ignore_patterns(ignore_file_path, &ignore_patterns, &ignore_count);
+    IgnorePatterns ignore_patterns = {0};
+    load_ignore_patterns(&ignore_patterns, ignore_file_path);
     
     WIN32_FIND_DATA find_data;
     HANDLE hFind;
@@ -145,7 +63,7 @@ void get_repo_files(const char *path, Files *repo_files, const char *ignore_file
 
         int is_directory = (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 
-        if (should_ignore(relative_path, ignore_patterns, ignore_count, is_directory))
+        if (should_ignore(relative_path, &ignore_patterns, is_directory))
             continue;
 
         if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {

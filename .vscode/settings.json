@@ -5,6 +5,11 @@
         "algorithm": "c",
         "format": "c",
         "dirent.h": "c",
-        "direct.h": "c"
+        "direct.h": "c",
+        "file.h": "c",
+        "minwindef.h": "c",
+        "dynamic_array.h": "c",
+        "stdlib.h": "c",
+        "stdio.h": "c"
     }
 }

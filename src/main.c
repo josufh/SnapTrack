@@ -1,13 +1,13 @@
 #include <stdio.h>
 #include <windows.h>
-#include "snaptrack_lib.c"
+#include "snaptrack.h"
 
 /*
 TODO asap
 commit deleted files show message
 
 TODO later
-
+store all open files and da
 not commit if last commit index is same
 snapshot clean (clean blobs that arent used, clean after commit)
 revert -soft -hard?

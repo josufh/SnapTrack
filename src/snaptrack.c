@@ -5,32 +5,9 @@
 #include <windows.h>
 #include <dirent.h>
 #include <time.h>
-#include "fileutils.c"
+#include "file.h" 
 #include "stringutils.c"
 #include "config.c"
-
-#define REPO_PATH "."
-
-// Command check
-typedef enum {
-    Init = 0,
-    Status,
-    Stage,
-    CommitChanges,
-    Config,
-    Revert,
-    UnknownCommand
-} Command;
-
-Command which_command(const char *command) {
-    if (is_same_string(command, "init")) return Init;
-    else if (is_same_string(command, "status")) return Status;
-    else if (is_same_string(command, "stage")) return Stage;
-    else if (is_same_string(command, "commit")) return CommitChanges;
-    else if (is_same_string(command, "config")) return Config;
-    else if (is_same_string(command, "revert")) return Revert;
-    else return UnknownCommand;
-}
 
 // SHA1
 typedef void (*SHA1FileFunc)(const char *filename, unsigned char hash[SHA1_BLOCK_SIZE]);
@@ -167,11 +144,11 @@ void stage_files(const char *repo_path) {
 }
 
 // Status
-void check_status(const char *repo_path) {
-    repo_must_exist(repo_path);
+void check_status() {
+    repo_must_exist(REPO_PATH);
 
     char index_path[MAX_PATH];
-    snprintf(index_path, sizeof(index_path), "%s\\.snaptrack\\index", repo_path);
+    snprintf(index_path, sizeof(index_path), "%s\\.snaptrack\\index", REPO_PATH);
 
     FILE *index_file = file_open(index_path, "r");
 
@@ -196,7 +173,7 @@ void check_status(const char *repo_path) {
     }
 
     Files repo_files = {0};
-    get_repo_files(repo_path, &repo_files, ".snaptrackignore");
+    get_repo_files(REPO_PATH, &repo_files, ".snaptrackignore");
 
     for (int i = 0; i < repo_files.count; i++) {
         unsigned char hash[SHA1_BLOCK_SIZE];
