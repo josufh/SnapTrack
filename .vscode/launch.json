@@ -24,7 +24,7 @@
             "name": "(gdb) Launch test",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}\\ignore_test.exe",
+            "program": "${workspaceFolder}\\file_test.exe",
             "args": [], 
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

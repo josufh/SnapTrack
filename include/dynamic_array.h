@@ -34,7 +34,7 @@ typedef struct DA {
 
 #define DA_ADD(da, element) \
     do { \
-        if ((da).capacity == 0) { DA_INIT(da, sizeof(typeof(element))); } \
+        if ((da).capacity == 0) { DA_INIT(da, sizeof(typeof(*element))); } \
         else if ((da).count == (da).capacity) { DA_RESIZE(da); } \
         memcpy(((char *)(da).items) + ((da).count * (da).item_size), element, (da).item_size); \
         (da).count++; \
