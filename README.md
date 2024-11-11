@@ -36,6 +36,22 @@ Commits current changes.
 
 List commits.
 
+- `snaptrack revert <commit hash>`
+
+Reverts to previous commit using the hashes in commits list.
+
+- `snaptrack branch <name>`
+
+Creates a new branch, and "moves" to that branch.
+
+- `snaptrack branch -l`
+
+List branches.
+
+- `snaptrack branch -d <name>`
+
+Deletes branch.
+
 - `.snaptrackignore`
 
 File that tells SnapTrack what files and directories to ignore. By default it ignores `.snaptrack\` and `.snaptrackignore`. To ignore directories write the directory path with `\` at the end, for files write the path to the file, you can use wildcards!
