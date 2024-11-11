@@ -6,7 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}\\snaptrack.exe",
-            "args": ["commit", "-l"], 
+            "args": ["branch", "branch1"], 
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

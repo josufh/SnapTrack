@@ -72,6 +72,19 @@ int main(int argc, char *argv[]) {
         revert_commit(argv[2]);
         break;
 
+    case Branch:
+        if (argc < 3) {
+            current_branch();
+        }
+        if (strcmp(argv[2], "-l") == 0) {
+            list_branches();
+        } else if (strcmp(argv[2], "-d") == 0 && argc > 3) {
+            delete_branch(argv[3]);
+        } else {
+            create_branch(argv[2]);
+        }
+        break;
+
     default:
         fprintf(stderr, "Unkwon command: %s\n", argv[1]);
         return 1;

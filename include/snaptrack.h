@@ -10,6 +10,7 @@ typedef enum {
     CommitChanges,
     Config,
     Revert,
+    Branch,
     UnknownCommand
 } Command;
 
@@ -33,5 +34,9 @@ void commit_changes(const char *commit_message);
 void get_commit_info(Commit *commit, const char *commit_hash);
 void list_commits();
 void revert_commit(const char *revert_hash);
+void current_branch();
+void create_branch(const char *branch_name);
+void list_branches();
+void delete_branch();
 
 #endif // SNAPTRACK_H

@@ -16,6 +16,7 @@ Command which_command(const char *command) {
     else if (is_same_string(command, "commit")) return CommitChanges;
     else if (is_same_string(command, "config")) return Config;
     else if (is_same_string(command, "revert")) return Revert;
+    else if (is_same_string(command, "branch")) return Branch;
     else return UnknownCommand;
 }
 
@@ -24,10 +25,11 @@ void init_repository(const char *repo_path) {
     check_repo_already_exists(repo_path);
     make_directory(repo_path, "");
     make_directory(repo_path, "objects");
-    make_directory(repo_path, "branches");
-    create_file(repo_path, "branches\\main", "");
+    make_directory(repo_path, "refs");
+    make_directory(repo_path, "refs\\branches");
+    create_file(repo_path, "refs\\branches\\main", "");
 
-    create_file(repo_path, "HEAD", "branches\\main");
+    create_file(repo_path, "HEAD", "refs\\branches\\main");
     create_file(repo_path, "index", NULL);
 
     fprintf(stdout, "Initialized local empty SnapTrack repository\n");
@@ -242,6 +244,8 @@ void commit_changes(const char *commit_message) {
 
     remove(temp_commit.path);
     free_library(&sha1_dll);
+
+    printf("TODO: Commit done message\n");
 }
 
 void get_commit_info(Commit *commit, const char *commit_hash) {
@@ -374,4 +378,126 @@ void revert_commit(const char *revert_hash) {
 
     free_files(&repo_files);
     free_files(&revert_files);
+}
+
+// Branch
+void get_current_branch_path(char *branch_string) {
+    char head_path[MAX_PATH];
+    snprintf(head_path, MAX_PATH, "%s\\.snaptrack\\HEAD", REPO_PATH);
+    FILE *head_file = file_open(head_path, "r");
+
+    char line[MAX_PATH];
+    fgets(line, MAX_PATH, head_file);
+    strcpy(branch_string, line);
+}
+
+void current_branch() {
+    repo_must_exist(REPO_PATH);
+    char branch_path[MAX_PATH];
+    get_current_branch_path(branch_path);
+
+    char branch_name[256];
+    strcpy(branch_name, strrchr(branch_path, '\\')+1);
+
+    fprintf(stdout, "Current branch: %s\n", branch_name);
+}
+
+void list_branches() {
+    repo_must_exist(REPO_PATH);
+    char branches_path[MAX_PATH];
+    snprintf(branches_path, MAX_PATH, "%s\\.snaptrack\\refs\\branches", REPO_PATH);
+
+    DynamicArray branches = {0};
+    DA_INIT(branches, 256);
+
+    DIR *dir = opendir(branches_path);
+    struct dirent *entry;
+    while((entry = readdir(dir)) != NULL) {
+        if (is_same_string(entry->d_name, ".") || is_same_string(entry->d_name, "..")) continue;
+        DA_ADD(branches, entry->d_name);
+    }
+    closedir(dir);
+
+    fprintf(stdout, "Branch list:\n");
+    for (int i = 0; i < branches.count; i++) {
+        char *branch = DA_GET(branches, i);
+        fprintf(stdout, "\t%s\n", branch);
+    }
+
+    DA_FREE(branches);
+}
+
+void create_branch(const char *branch_name) {
+    repo_must_exist(REPO_PATH);
+    char branches_path[MAX_PATH];
+    snprintf(branches_path, MAX_PATH, "%s\\.snaptrack\\refs\\branches", REPO_PATH);
+
+    DynamicArray branches = {0};
+    DA_INIT(branches, 256);
+
+    DIR *dir = opendir(branches_path);
+    struct dirent *entry;
+    while((entry = readdir(dir)) != NULL) {
+        DA_ADD(branches, entry->d_name);
+    }
+    closedir(dir);
+
+    int is_new_branch = 1;
+    for (int i = 0; i < branches.count; i++) {
+        char *branch = DA_GET(branches, i);
+
+        if (is_same_string(branch, branch_name)) {
+            is_new_branch = 0;
+            break;
+        }
+    }
+    DA_FREE(branches);
+
+    if (!is_new_branch) {
+        fprintf(stdout, "Branch with name %s already exists\n", branch_name);
+        return;
+    }
+
+    char current_branch_relative_path[MAX_PATH];
+    get_current_branch_path(current_branch_relative_path);
+    char current_branch_path[MAX_PATH];
+    snprintf(current_branch_path, MAX_PATH, "%s\\.snaptrack\\%s", REPO_PATH, current_branch_relative_path);
+    FILE *current_branch_file = file_open(current_branch_path, "r");
+
+    char commit_hash[SHA1_STRING_SIZE];
+    fgets(commit_hash, SHA1_STRING_SIZE, current_branch_file);
+    fclose(current_branch_file);
+
+    char new_branch_file_path[MAX_PATH];
+    snprintf(new_branch_file_path, MAX_PATH, "%s\\.snaptrack\\refs\\branches\\%s", REPO_PATH, branch_name);
+
+    FILE *new_branch_file = file_open(new_branch_file_path, "w");
+    fputs(commit_hash, new_branch_file);
+    fclose(new_branch_file);
+
+    char head_path[MAX_PATH];
+    snprintf(head_path, MAX_PATH, "%s\\.snaptrack\\HEAD", REPO_PATH);
+    FILE *head_file = file_open(head_path, "w");
+
+    fprintf(head_file, "refs\\branches\\%s", branch_name);
+    fclose(head_file);
+}
+
+void delete_branch(const char *branch_name_to_delete) {
+    repo_must_exist(REPO_PATH);
+    char branch_path[MAX_PATH];
+    get_current_branch_path(branch_path);
+
+    char branch_name[256];
+    strcpy(branch_name, strrchr(branch_path, '\\')+1);
+
+    if (is_same_string(branch_name_to_delete, branch_name)) {
+        printf("Failed to delete: trying to delete current branch\n");
+        return;
+    }
+
+    char branch_file_path_to_delete[MAX_PATH];
+    snprintf(branch_file_path_to_delete, MAX_PATH, "%s\\.snaptrack\\refs\\branches\\%s", REPO_PATH, branch_name_to_delete);
+
+    remove(branch_file_path_to_delete);
 }

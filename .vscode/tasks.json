@@ -9,11 +9,7 @@
                 "-g",
                 "-o",
                 "snaptrack",
-                "src\\main.c",
-                "src\\file.c",
-                "src\\snaptrack.c",
-                "src\\ignore.c",
-                "src\\config.c",
+                "src\\*.c",
                 "-Iinclude",
                 "-L.",
                 "-lsha1"
