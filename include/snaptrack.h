@@ -37,6 +37,6 @@ void revert_commit(const char *revert_hash);
 void current_branch();
 void create_branch(const char *branch_name);
 void list_branches();
-void delete_branch();
+void delete_branch(const char *branch_name_to_delete);
 
 #endif // SNAPTRACK_H
