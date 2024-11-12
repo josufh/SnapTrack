@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Wrong usage: snaptrack add <file/dir name>\n");
             return 1;
         }
-        stage_files(argv[2]);
+        stage(argv[2]);
         break;
 
     case CommitChanges:

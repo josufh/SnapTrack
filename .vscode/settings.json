@@ -20,6 +20,11 @@
         "tuple": "c",
         "type_traits": "c",
         "utility": "c",
-        "variant": "c"
+        "variant": "c",
+        "string.h": "c",
+        "string": "c",
+        "string_view": "c",
+        "initializer_list": "c",
+        "span": "c"
     }
 }

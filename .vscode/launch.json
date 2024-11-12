@@ -11,7 +11,7 @@
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": true,
-            "preLaunchTask": "Build SnapTrack",
+            //"preLaunchTask": "Build SnapTrack",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",

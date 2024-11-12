@@ -160,10 +160,6 @@ void init_path_files(const char *path) {
             sha1_to_hex(hash, file->hash);
         }
     }
-    for (int i = 0; i < path_files.count; i++) {
-        
-        
-    }
     
     free_library(&sha1_dll);
 }

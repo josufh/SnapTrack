@@ -16,7 +16,7 @@ typedef enum {
 
 Command which_command(const char *command);
 void init_repository();
-void stage_files(const char *to_stage);
+void stage(const char *to_stage);
 void check_status();
 
 typedef struct {

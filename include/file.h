@@ -25,7 +25,6 @@ void sha1_to_hex(unsigned char hash[SHA1_BLOCK_SIZE], char output[SHA1_STRING_SI
 
 int is_same_string(const char *string1, const char *string2);
 
-
 typedef enum {
     Staged = 0,
     New,
