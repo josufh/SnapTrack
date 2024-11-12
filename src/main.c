@@ -4,36 +4,40 @@
 
 /*
 TODO asap
+global variables, index_files, path_files, sha1
 commit deleted files show message
+revert add
+add one at a time
 
 TODO later
-store all open files and da
 not commit if last commit index is same
 snapshot clean (clean blobs that arent used, clean after commit)
 revert -soft -hard?
 no revert if last commit
-refactor......
-release
+redmine(進捗管理)
+
 
 */
 
 int main(int argc, char *argv[]) {
     if (argc < 2)
         return 1;
-    
-    const char *repo_path = ".";
 
     switch (which_command(argv[1])) {
     case Init:
-        init_repository(repo_path);
+        init_repository();
         break;
     
     case Status:
-        check_status(repo_path);
+        check_status();
         break;
 
-    case Stage:
-        stage_files(repo_path);
+    case Add:
+        if (argc < 3) {
+            fprintf(stderr, "Wrong usage: snaptrack add <file/dir name>\n");
+            return 1;
+        }
+        stage_files(argv[2]);
         break;
 
     case CommitChanges:

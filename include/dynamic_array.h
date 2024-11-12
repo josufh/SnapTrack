@@ -54,12 +54,8 @@ typedef struct DA {
     (void *)((char *)(da).items + ((index)*(da).item_size)) : \
     (fprintf(stderr, "Error: Index %d, is out of bounds (0-%d)\n", (index), (da).count-1), exit(EXIT_FAILURE), (void *)NULL))
 
-#define DA_PRINT(da) \
-    do { \
-        fprintf(stdout, "DynamicArray content:\n"); \
-        for (int i = 0; i < (da).count; i++) { \
-            fprintf(stdout, "\t%s\n", (char *)DA_GET(da, i)); \
-        } \
-    } while (0)
+#define DA_FOREACH(da, var, type) \
+    for (size_t _i = 0; _i < (da).count; ++_i) \
+        for (type *var = (type *)((char *)(da).items + _i * (da).item_size); var != NULL; var = NULL)
 
 #endif // DYNAMIC_ARRAY_H

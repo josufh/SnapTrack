@@ -6,11 +6,12 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}\\snaptrack.exe",
-            "args": ["branch", "branch1"], 
+            "args": ["add", "assets\\icon.png"], 
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": true,
+            "preLaunchTask": "Build SnapTrack",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",

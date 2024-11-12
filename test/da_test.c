@@ -7,9 +7,12 @@ int main() {
     DynamicArray numbers = {0};
     int ten = 10;
     DA_ADD(numbers, &ten);
+    int twenty = 20;
+    DA_ADD(numbers, &twenty);
 
-    int *number = (int *)DA_GET(numbers, 0);
-    printf("Number: %d\n", *number);
+    DA_FOREACH(numbers, int, number) {
+        printf("%d\n", *number);
+    }
 
     DA_FREE(numbers);
     return 0;

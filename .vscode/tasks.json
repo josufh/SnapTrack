@@ -20,6 +20,25 @@
             },
             "problemMatcher": ["$gcc"],
             "detail": "Compile snaptrack.c"
+        },
+        {
+            "label": "Build SnapTrack Test",
+            "type": "shell",
+            "command": "gcc",
+            "args": [
+                "-g",
+                "-o",
+                "da_test",
+                "test\\da_test.c",
+                "-Iinclude",
+                "-L.",
+                "-lsha1"
+            ],
+            "group": {
+                "kind": "build",
+            },
+            "problemMatcher": ["$gcc"],
+            "detail": "Compile snaptrack.c"
         }
     ]
 }

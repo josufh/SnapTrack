@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <minwindef.h>
 #include "dynamic_array.h"
+#include "ignore.h"
 
 #define REPO_PATH "."
 
@@ -24,7 +25,6 @@ void sha1_to_hex(unsigned char hash[SHA1_BLOCK_SIZE], char output[SHA1_STRING_SI
 
 int is_same_string(const char *string1, const char *string2);
 
-#define Files DynamicArray
 
 typedef enum {
     Staged = 0,
@@ -39,20 +39,34 @@ typedef struct {
     FileStatus status;
 } File;
 
+#define Files DynamicArray
+#define foreach_file(files, file) DA_FOREACH(files, file, File)
+
+extern Files index_files, path_files;
+
+void init_index_files(const char *path);
+void free_index_files();
+
+void init_path_files(const char *path);
+void free_path_files();
+
+void get_files_from_path(const char *path);
 File *get_file_at_index(Files files, size_t index);
+
+void create_object(File file);
+
 void print_files_by_status(Files files, FileStatus status);
 
 FILE *file_open(const char* filepath, const char* mode);
 void free_files(Files *files);
 
-void get_repo_files(const char *path, Files *repo_files, const char *ignore_file_path);
-void get_index_files(const char *index_path, Files *index_files, FileStatus status);
-
 int does_dir_exist(const char *path);
 void check_repo_already_exists(const char *repo_path);
 void repo_must_exist(const char *repo_path);
+void path_must_be_valid(const char *path);
 
 void make_directory(const char *repo_path, const char *subdir);
 void create_file(const char *repo_path, const char *subpath, const char *content);
+int is_directory(const char *path);
 
 #endif // FILE_H

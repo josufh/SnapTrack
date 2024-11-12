@@ -6,7 +6,7 @@
 typedef enum {
     Init = 0,
     Status,
-    Stage,
+    Add,
     CommitChanges,
     Config,
     Revert,
@@ -15,8 +15,8 @@ typedef enum {
 } Command;
 
 Command which_command(const char *command);
-void init_repository(const char *repo_path);
-void stage_files(const char *repo_path);
+void init_repository();
+void stage_files(const char *to_stage);
 void check_status();
 
 typedef struct {
