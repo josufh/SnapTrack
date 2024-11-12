@@ -9,6 +9,7 @@
 #include "config.h"
 #include "snaptrack.h"
 #include "ignore.h"
+#include "string.h"
 
 Command which_command(const char *command) {
     if (is_same_string(command, "init")) return Init;
@@ -56,12 +57,10 @@ void compare_repo_index(Files *staged_files, Files *repo_files) {
 }
 
 // Stage
-void stage_files(const char *to_stage_path) {
-    repo_must_exist(REPO_PATH);
-    int path_exists = does_dir_exist(to_stage_path);
-
-    // Get files from the passed path
+void stage_single_file(const char *to_stage_path) {
+    // Get file
     init_path_files(to_stage_path);
+    File to_stage_file = *get_file_at_index(path_files, 0);
 
     // Get branch index files
     char index_path[MAX_PATH];
@@ -73,38 +72,54 @@ void stage_files(const char *to_stage_path) {
     snprintf(temp_path, MAX_PATH, "%s\\.snaptrack\\temp_index", REPO_PATH);
     FILE *temp_file = file_open(temp_path, "w");
 
-    if (!is_directory(to_stage_path)) {
-        File file_to_stage = *get_file_at_index(path_files, 0);
-        if (file_to_stage.status == Deleted) {
-            foreach_file(index_files, index_file) {
-                if (is_same_string(index_file->path, file_to_stage.path)) {
-                    
-                }
+    if (to_stage_file.status == Deleted) {
+        foreach_file(index_files, index_file) {
+            if (is_same_string(index_file->path, to_stage_file.path)) {
+                to_stage_file.status = Staged;
+            } else {
+                fprintf(temp_file, "%s %s\n", index_file->path, index_file->hash);
             }
+        }
+        if (to_stage_file.status == Deleted) {
             fprintf(stderr, "Error: %s did not match any files\n", to_stage_path);
             exit(EXIT_FAILURE);
         }
-
+    } else {
         foreach_file(index_files, index_file) {
-            if (is_same_string(index_file->path, file_to_stage.path)) {
-                if (is_same_string(index_file->hash, file_to_stage.hash)) {
-                    file_to_stage.status = Staged;
+            if (is_same_string(index_file->path, to_stage_file.path)) {
+                if (is_same_string(index_file->hash, to_stage_file.hash)) {
+                    to_stage_file.status = Staged;
                 } else {
-                    file_to_stage.status = Modified;
-                    create_object(file_to_stage);
+                    to_stage_file.status = Modified;
+                    create_object(to_stage_file);
                 }
-                fprintf(temp_file, "%s %s\n", file_to_stage.path, file_to_stage.hash);
+                fprintf(temp_file, "%s %s\n", to_stage_file.path, to_stage_file.hash);
             }
             fprintf(temp_file, "%s %s\n", index_file->path, index_file->hash);
         }
+        if (to_stage_file.status == New) {
+            fprintf(temp_file, "%s %s\n", to_stage_file.path, to_stage_file.hash);
+            create_object(to_stage_file);
+        }
     }
+
+    free_index_files();
+    free_path_files();
 
     fclose(temp_file);
     remove(index_path);
     rename(temp_path, index_path);
+}
 
-    free_index_files();
-    free_path_files();
+void stage(const char *to_stage_path) {
+    repo_must_exist(REPO_PATH);
+
+    if (!is_directory(to_stage_path)) {
+        stage_single_file(to_stage_path);
+        return;
+    }
+    
+    
 }
 
 // Status
@@ -374,7 +389,7 @@ void revert_commit(const char *revert_hash) {
         }
     }
 
-    stage_files(REPO_PATH);
+    stage(REPO_PATH);
     char message[256];
     snprintf(message, 256, "REVERT TO COMMIT HASH: %s", revert_commit.hash);
     commit_changes(message);
