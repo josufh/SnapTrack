@@ -4,7 +4,6 @@
 
 /*
 TODO asap
-global variables, index_files, path_files, sha1
 commit deleted files show message
 revert add
 add one at a time

@@ -118,8 +118,9 @@ void stage(const char *to_stage_path) {
         stage_single_file(to_stage_path);
         return;
     }
-    
-    
+
+    // get all files in dir and set to new
+    // get index files with same 
 }
 
 // Status
