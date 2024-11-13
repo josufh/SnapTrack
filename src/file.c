@@ -124,15 +124,20 @@ void get_files_from_path(const char *path) {
     FindClose(hFind);
 }
 
+void add_file(Files *files, File *file) {
+    DA_ADD(*files, file);
+}
+
 void init_index_files(const char *path) {
     FILE *index_file = file_open(path, "r");
     
-    char line[MAX_PATH];
-    while (fgets(line, MAX_PATH, index_file)) {
+    char line[1024];
+    while (fgets(line, 1024, index_file)) {
         File new_file = {0};
-        sscanf(line, "%s %s", new_file.path, new_file.hash);
+        sscanf(line, "%d %s %s %d", new_file.staged ,new_file.path, new_file.hash, new_file.status);
+        new_file.status = Deleted;
         
-        DA_ADD(index_files, &new_file);
+        add_file(&index_files, &index_file);
     }
 
     fclose(index_file);
