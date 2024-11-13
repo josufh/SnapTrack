@@ -26,7 +26,7 @@ void sha1_to_hex(unsigned char hash[SHA1_BLOCK_SIZE], char output[SHA1_STRING_SI
 int is_same_string(const char *string1, const char *string2);
 
 typedef enum {
-    Staged = 0,
+    Unchanged,
     New,
     Modified,
     Deleted
@@ -36,6 +36,7 @@ typedef struct {
     char path[MAX_PATH];
     char hash[SHA1_STRING_SIZE];
     FileStatus status;
+    int staged;
 } File;
 
 #define Files DynamicArray
@@ -43,8 +44,9 @@ typedef struct {
 
 extern Files index_files, path_files;
 
+void load_index_files(const char *path, Files *files);
 void init_index_files(const char *path);
-void free_index_files();
+void free_index_files(Files *files);
 
 void init_path_files(const char *path);
 void free_path_files();
@@ -54,7 +56,7 @@ File *get_file_at_index(Files files, size_t index);
 
 void create_object(File file);
 
-void print_files_by_status(Files files, FileStatus status);
+void print_repo_status();
 
 FILE *file_open(const char* filepath, const char* mode);
 void free_files(Files *files);

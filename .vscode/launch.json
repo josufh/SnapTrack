@@ -6,7 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}\\snaptrack.exe",
-            "args": ["add", "assets\\icon.png"], 
+            "args": ["status"], 
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

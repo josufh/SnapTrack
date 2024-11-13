@@ -43,21 +43,28 @@ File *get_file_at_index(Files files, size_t index) {
     return (File *)DA_GET(files, index);
 }
 
-static const char *file_status_string[] = {"Staged", "New", "Modified", "Deleted"};
+const char *file_status_string[] = {"Unchanged", "New", "Modified", "Deleted"};
 
-void print_files_by_status(Files files, FileStatus status) {
-    int print = 1;
-    for (int i = 0; i < files.count; i++) {
-        File *file = get_file_at_index(files, i);
-        if (file->status == status) {
-            if (print) {
-                print = 0;
-                fprintf(stdout, "%s files:\n", file_status_string[status]);
-            }
-            fprintf(stdout, "\t%s\n", file->path);
-        } 
+void print_repo_status() {
+    fprintf(stdout, "Staged changes:\n");
+    foreach_file(path_files, file) {
+        if (file->staged && file->status != Unchanged)
+            fprintf(stdout, "\t%s: %s\n", file_status_string[file->status], file->path);
     }
-    if (!print) fprintf(stdout, "\n");
+    foreach_file(index_files, file) {
+        if (file->status == Deleted && is_same_string(file->hash, "0"))
+            fprintf(stdout, "\t%s: %s\n", file_status_string[file->status], file->path);
+    }
+
+    fprintf(stdout, "\nNOT staged changes:\n");
+    foreach_file(path_files, file) {
+        if (!file->staged && file->status != Unchanged)
+            fprintf(stdout, "\t%s: %s\n", file_status_string[file->status], file->path);
+    }
+    foreach_file(index_files, file) {
+        if (file->status == Deleted)
+            fprintf(stdout, "\t%s: %s\n", file_status_string[file->status], file->path);
+    }
 }
 
 FILE *file_open(const char* filepath, const char* mode) {
@@ -74,17 +81,22 @@ void free_files(Files *files) {
 }
 
 void get_files_from_path(const char *path) { 
-    if (path[strlen(path)-1] != '\\') {
+    if (path[strlen(path)-1] != '\\' && *path != '.') {
         File new_file = {0};
         strcpy(new_file.path, path);
         new_file.status = New;
+        new_file.staged = 0;
         DA_ADD(path_files, &new_file);
         return;
     }
 
+    char search_path[MAX_PATH];
+    snprintf(search_path, MAX_PATH, "%s\\*", path);
+
+
     WIN32_FIND_DATA find_data;
     HANDLE hFind;
-    hFind = FindFirstFile(path, &find_data);
+    hFind = FindFirstFile(search_path, &find_data);
     if (hFind == INVALID_HANDLE_VALUE) {
         perror("Failed to open directory");
         return;
@@ -134,17 +146,34 @@ void init_index_files(const char *path) {
     char line[1024];
     while (fgets(line, 1024, index_file)) {
         File new_file = {0};
-        sscanf(line, "%d %s %s %d", new_file.staged ,new_file.path, new_file.hash, new_file.status);
+        sscanf(line, "%s %s", new_file.path, new_file.hash);
+        new_file.staged = 1;
         new_file.status = Deleted;
         
-        add_file(&index_files, &index_file);
+        add_file(&index_files, &new_file);
     }
 
     fclose(index_file);
 }
 
-void free_index_files() {
-    free_files(&index_files);
+void load_index_files(const char *path, Files *files) {
+    FILE *index_file = file_open(path, "r");
+    
+    char line[1024];
+    while (fgets(line, 1024, index_file)) {
+        File new_file = {0};
+        sscanf(line, "%s %s", new_file.path, new_file.hash);
+        new_file.staged = 1;
+        new_file.status = Deleted;
+        
+        add_file(files, &new_file);
+    }
+
+    fclose(index_file);
+}
+
+void free_index_files(Files *files) {
+    free_files(files);
 }
 
 void init_path_files(const char *path) {
@@ -185,8 +214,6 @@ void create_object(File file) {
     }
 
     fclose(object_file); fclose(src_file);
-
-    fprintf(stdout, "Stated changes for file %s with hash %s\n", file.path, file.hash);
 }
 
 int does_dir_exist(const char *path) {
