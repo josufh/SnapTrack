@@ -47,22 +47,13 @@ const char *file_status_string[] = {"Unchanged", "New", "Modified", "Deleted"};
 
 void print_repo_status() {
     fprintf(stdout, "Staged changes:\n");
-    foreach_file(path_files, file) {
-        if (file->staged && file->status != Unchanged)
-            fprintf(stdout, "\t%s: %s\n", file_status_string[file->status], file->path);
-    }
     foreach_file(index_files, file) {
-        if (file->status == Deleted && is_same_string(file->hash, "0"))
-            fprintf(stdout, "\t%s: %s\n", file_status_string[file->status], file->path);
+        fprintf(stdout, "\t%s: %s\n", file_status_string[file->status], file->path);
     }
 
     fprintf(stdout, "\nNOT staged changes:\n");
     foreach_file(path_files, file) {
         if (!file->staged && file->status != Unchanged)
-            fprintf(stdout, "\t%s: %s\n", file_status_string[file->status], file->path);
-    }
-    foreach_file(index_files, file) {
-        if (file->status == Deleted)
             fprintf(stdout, "\t%s: %s\n", file_status_string[file->status], file->path);
     }
 }
@@ -148,7 +139,7 @@ void init_index_files(const char *path) {
         File new_file = {0};
         sscanf(line, "%s %s", new_file.path, new_file.hash);
         new_file.staged = 1;
-        new_file.status = Deleted;
+        new_file.status = New;
         
         add_file(&index_files, &new_file);
     }
@@ -163,7 +154,7 @@ void load_index_files(const char *path, Files *files) {
     while (fgets(line, 1024, index_file)) {
         File new_file = {0};
         sscanf(line, "%s %s", new_file.path, new_file.hash);
-        new_file.staged = 1;
+        new_file.staged = 0;
         new_file.status = Deleted;
         
         add_file(files, &new_file);
@@ -186,6 +177,7 @@ void init_path_files(const char *path) {
     SHA1FileFunc sha1_file = (SHA1FileFunc)sha1_dll.func;
 
     foreach_file(path_files, file) {
+        file->staged = 0;
         if (!does_dir_exist(file->path)) {
             file->status = Deleted;
         } else {

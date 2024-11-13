@@ -69,32 +69,71 @@ void get_last_commit_index(Files *files) {
 }
 
 void compare_index_repo() {
-    Files last_index_files = {0};
-    get_last_commit_index(&last_index_files);
+    Files last_files = {0};
+    get_last_commit_index(&last_files);
 
-    foreach_file(path_files, repo_file) {
-        foreach_file(index_files, index_file) {
-            if (is_same_string(index_file->path, repo_file->path)) {
-                index_file->status = Unchanged;
-                if (is_same_string(index_file->hash, repo_file->hash)) {
-                    repo_file->staged = 1;
-                    foreach_file(last_index_files, last_file) {
-                        if (is_same_string(last_file->path, index_file->path)) {
-                            if (is_same_string(last_file->hash, index_file->hash)) {
-                                repo_file->status = Unchanged;
-                            } else {
-                                repo_file->status = Modified;
-                            }
-                        }
-                    }                    
+    foreach_file(last_files, last_file) {
+        foreach_file(path_files, path_file) {
+            if (is_same_string(path_file->path, last_file->path)) {
+                if (is_same_string(path_file->hash, last_file->hash)) {
+                    last_file->status = Unchanged;
+                    path_file->status = Unchanged;
+                    last_file->staged = 1;
+                    path_file->staged = 1;
                 } else {
-                    repo_file->status = Modified;
+                    last_file->status = Modified;
+                    path_file->status = Modified;
+                    foreach_file(index_files, index_file) {
+                        if (is_same_string(path_file->path, index_file->path) && is_same_string(path_file->hash, index_file->hash))
+                            path_file->staged = 1;
+                    }
                 }
+                break;
+            }
+            
+        }
+        if (last_file->status == Deleted) {
+            foreach_file(index_files, index_file) {
+                if (is_same_string(last_file->path, index_file->path) && strcmp("0", index_file->hash) == 0)
+                    last_file->staged = 1;
             }
         }
     }
+    foreach_file(path_files, path_file) {
+        if (path_file->status == New) {
+            foreach_file(index_files, index_file) {
+                if (is_same_string(path_file->path, index_file->path) && is_same_string(path_file->hash, index_file->hash))
+                    path_file->staged = 1;
+            }
+        }
+    }
+
+    const char *file_status_string[] = {"Unchanged", "New", "Modified", "Deleted"};
+    fprintf(stdout, "Staged files:\n");
+    foreach_file(last_files, file) {
+        if (file->staged && file->status != Unchanged) {
+            fprintf(stdout, "\t%s: %s\n", file_status_string[file->status], file->path);
+        }
+    }
+    foreach_file(path_files, file) {
+        if (file->staged && file->status != Unchanged) {
+            fprintf(stdout, "\t%s: %s\n", file_status_string[file->status], file->path);
+        }
+    }
+
+    fprintf(stdout, "\nNot staged files:\n");
+    foreach_file(last_files, file) {
+        if (!file->staged) {
+            fprintf(stdout, "\t%s: %s\n", file_status_string[file->status], file->path);
+        }
+    }
+    foreach_file(path_files, file) {
+        if (!file->staged && file->status == New) {
+            fprintf(stdout, "\t%s: %s\n", file_status_string[file->status], file->path);
+        }
+    }
     
-    free_files(&last_index_files);
+    free_files(&last_files);
 }
 
 void check_status() {
@@ -107,8 +146,6 @@ void check_status() {
     init_index_files(index_path);
 
     compare_index_repo();
-
-    print_repo_status();
 
     free_path_files();
     free_index_files(&index_files);
@@ -123,26 +160,34 @@ void stage_files(const char *to_stage_path) {
     snprintf(index_path, MAX_PATH, "%s\\.snaptrack\\index", REPO_PATH);
     init_index_files(index_path);
 
+    char temp_path[MAX_PATH];
+    snprintf(temp_path, MAX_PATH, "%s\\.snaptrack\\temp_index", REPO_PATH);
+    FILE *temp_file = file_open(temp_path, "w");
+
     foreach_file(index_files, index_file) {
         index_file->staged = 0;
         foreach_file(path_files, path_file) {
             if (is_same_string(path_file->path, index_file->path)) {
                 index_file->staged = 1;
                 if (path_file->status == Deleted) {
-                    // hash to 0
-                    printf("deleted: %s\n", index_file->path);
+                    fprintf(temp_file, "%s 0\n", index_file->path);
+                    printf("Staging deletion of file: %s\n", index_file->path);
                 } else if (!is_same_string(path_file->hash, index_file->hash)) {
                     // new hash
-                    printf("modified: %s\n", index_file->path);
+                    printf("Staging modification of file: %s\n", path_file->path);
                     path_file->status = Modified;
+                    fprintf(temp_file, "%s %s\n", path_file->path, path_file->hash);
+                } else {
+                    fprintf(temp_file, "%s %s\n", path_file->path, path_file->hash);
+                    path_file->status = Unchanged;
                 }
             }
         }
         if (!index_file->staged) {
             if (strncmp(index_file->path, to_stage_path, strlen(to_stage_path)) == 0 && !does_dir_exist(index_file->path)) {
-                printf("deleted: %s\n", index_file->path);
+                printf("Staging deletion of file: %s\n", index_file->path);
             } else {
-                printf("as is: %s\n", index_file->path);
+                fprintf(temp_file, "%s %s\n", index_file->path, index_file->hash);
             }
         }
     }
@@ -151,8 +196,16 @@ void stage_files(const char *to_stage_path) {
         if (path_file->status == New) {
             printf("Staging new file %s with hash %s\n", path_file->path, path_file->hash);
             create_object(*path_file);
+            fprintf(temp_file, "%s %s\n", path_file->path, path_file->hash);
         }
     }
+
+    free_index_files(&index_files);
+    free_path_files();
+    fclose(temp_file);
+
+    remove(index_path);
+    rename(temp_path, index_path);
 }
 
 // Commit
