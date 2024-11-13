@@ -5,18 +5,9 @@
 #include <minwindef.h>
 #include "dynamic_array.h"
 #include "ignore.h"
+#include "sha.h"
 
 #define REPO_PATH "."
-
-#define SHA1_BLOCK_SIZE 20
-#define SHA1_STRING_SIZE 41 // SHA1_BLOCK_SIZE * 2 + 1
-
-typedef void (*SHA1FileFunc)(const char *filename, unsigned char hash[SHA1_BLOCK_SIZE]);
-
-typedef struct {
-    HMODULE handle;
-    void *func;
-} DLL;
 
 void load_function(DLL *dll, const char *library_name, const char *function_name);
 void free_library(DLL *dll);

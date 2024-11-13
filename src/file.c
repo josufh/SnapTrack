@@ -2,7 +2,6 @@
 #include <io.h>
 #include <windows.h>
 #include "file.h"
-#include "ignore.h"
 
 Files index_files = {0}, path_files = {0};
 

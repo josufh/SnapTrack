@@ -25,12 +25,13 @@ Command which_command(const char *command) {
 // Init
 void init_repository() {
     check_repo_already_exists(REPO_PATH);
+    
     make_directory(REPO_PATH, "");
     make_directory(REPO_PATH, "objects");
     make_directory(REPO_PATH, "refs");
     make_directory(REPO_PATH, "refs\\branches");
+    
     create_file(REPO_PATH, "refs\\branches\\main", "");
-
     create_file(REPO_PATH, "HEAD", "refs\\branches\\main");
     create_file(REPO_PATH, "index", NULL);
 
