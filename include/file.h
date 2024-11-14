@@ -32,7 +32,6 @@ typedef DynamicArray Cabinet;
 extern Cabinet cabinet;
 #define foreach_files(cab, files) DA_FOREACH(cab, files, Files *)
 
-
 Files *new_files_entry();
 void cleanup_cabinet();
 

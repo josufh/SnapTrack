@@ -1,13 +1,11 @@
 #include <stdio.h>
 #include "snaptrack.h"
 #include "config.h"
-#include "file.h"
+#include "print.h"
 
 /*
 TODO asap
-commit deleted files show message
 revert add
-add one at a time
 
 TODO later
 not commit if last commit index is same
@@ -21,7 +19,7 @@ redmine(進捗管理)
 
 int main(int argc, char *argv[]) {
     if (argc < 2)
-        return 1;
+        exit_error("show error message");
 
     switch (which_command(argv[1])) {
     case Init:
@@ -34,17 +32,14 @@ int main(int argc, char *argv[]) {
 
     case Add:
         if (argc < 3) {
-            fprintf(stderr, "Wrong usage: snaptrack add <file/dir name>\n");
-            return 1;
+            exit_error("Wrong usage: snaptrack add <file/dir name>\n");
         }
         stage_files(argv[2]);
         break;
 
     case CommitChanges:
         if (argc < 3) {
-            fprintf(stderr, "Wrong usage: snaptrack commit \"commit message...\"\n");
-            fprintf(stderr, "             snaptrack commit -l\n");
-            return 1;
+            exit_error("Wrong usage: snaptrack commit \"commit message...\"\n             snaptrack commit -l\n");
         }
         if (strcmp(argv[2], "-l") == 0) {
             list_commits();
@@ -70,7 +65,7 @@ int main(int argc, char *argv[]) {
 
     case Revert:
         if (argc < 3) {
-            fprintf(stderr, "Wrong usage: snaptrack revert <commit hash>\n");
+            exit_error("Wrong usage: snaptrack revert <commit hash>\n");
             return 1;
         }
         revert_commit(argv[2]);
@@ -79,6 +74,7 @@ int main(int argc, char *argv[]) {
     case Branch:
         if (argc < 3) {
             current_branch();
+            break;
         }
         if (strcmp(argv[2], "-l") == 0) {
             list_branches();
@@ -90,8 +86,7 @@ int main(int argc, char *argv[]) {
         break;
 
     default:
-        fprintf(stderr, "Unkwon command: %s\n", argv[1]);
-        return 1;
+        exit_error("Unkwon command: %s\n", argv[1]);
     }
     cleanup_cabinet();
     return 0;

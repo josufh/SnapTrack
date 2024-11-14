@@ -5,11 +5,11 @@
 #include <windows.h>
 #include <dirent.h>
 #include <time.h>
-#include "file.h"
+#include "print.h"
 #include "config.h"
 #include "snaptrack.h"
 #include "ignore.h"
-#include "string.h"
+#include "branch.h"
 
 Command which_command(const char *command) {
     if (is_same_string(command, "init")) return Init;
@@ -190,7 +190,7 @@ void stage_files(const char *to_stage_path) {
 
     foreach_file(*to_stage_files, path_file) {
         if (path_file->status == New) {
-            printf("Staging new file %s with hash %s\n", path_file->path, path_file->hash);
+            print_out(Green, "Staging new file %s with hash %s\n", path_file->path, path_file->hash);
             create_object(*path_file);
             fprintf(temp_file, "%s %s %d\n", path_file->path, path_file->hash, New);
         }
@@ -458,19 +458,20 @@ void list_branches() {
     char branches_path[MAX_PATH];
     snprintf(branches_path, MAX_PATH, "%s\\.snaptrack\\refs\\branches", REPO_PATH);
 
-    DynamicArray branches = {0};
+    Branches branches = {0};
 
     DIR *dir = opendir(branches_path);
     struct dirent *entry;
     while((entry = readdir(dir)) != NULL) {
         if (is_same_string(entry->d_name, ".") || is_same_string(entry->d_name, "..")) continue;
-        DA_ADD(branches, entry->d_name);
+        char *branch = (char *)malloc(entry->d_namlen);
+        strcpy(branch, entry->d_name);
+        DA_ADD(branches, branch);
     }
     closedir(dir);
 
     fprintf(stdout, "Branch list:\n");
-    for (int i = 0; i < branches.count; i++) {
-        char *branch = DA_GET(branches, i);
+    foreach_branch(branches, branch) {
         fprintf(stdout, "\t%s\n", branch);
     }
 
@@ -482,19 +483,20 @@ void create_branch(const char *branch_name) {
     char branches_path[MAX_PATH];
     snprintf(branches_path, MAX_PATH, "%s\\.snaptrack\\refs\\branches", REPO_PATH);
 
-    DynamicArray branches = {0};
+    Branches branches = {0};
 
     DIR *dir = opendir(branches_path);
     struct dirent *entry;
     while((entry = readdir(dir)) != NULL) {
-        DA_ADD(branches, entry->d_name);
+        if (is_same_string(entry->d_name, ".") || is_same_string(entry->d_name, "..")) continue;
+        char *branch = (char *)malloc(entry->d_namlen);
+        strcpy(branch, entry->d_name);
+        DA_ADD(branches, branch);
     }
     closedir(dir);
 
     int is_new_branch = 1;
-    for (int i = 0; i < branches.count; i++) {
-        char *branch = DA_GET(branches, i);
-
+    foreach_branch(branches, branch) {
         if (is_same_string(branch, branch_name)) {
             is_new_branch = 0;
             break;

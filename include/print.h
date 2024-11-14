@@ -5,20 +5,16 @@
 #include <stdarg.h>
 #include "file.h"
 
-void print(const char *format, ...) {
-    va_list args;
-    va_start(args, format);
-    vfprintf(stdout, format, args);
-    va_end(args);
-}
+typedef enum {
+    Reset,
+    Red,
+    Yellow,
+    White,
+    Green
+} Color;
 
-void exit_error(const char *format, ...) {
-    va_list args;
-    va_start(args, format);
-    vfprintf(stderr, format, args);
-    va_end(args);
-    cleanup_cabinet();
-    exit(EXIT_FAILURE);
-}
+void print_out(Color color, const char *format, ...);
+
+void exit_error(const char *format, ...);
 
 #endif // PRINT_H

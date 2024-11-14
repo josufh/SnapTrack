@@ -25,6 +25,7 @@
         "string": "c",
         "string_view": "c",
         "initializer_list": "c",
-        "span": "c"
+        "span": "c",
+        "branch.h": "c"
     }
 }
