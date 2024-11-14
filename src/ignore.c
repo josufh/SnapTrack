@@ -2,9 +2,7 @@
 
 IgnorePatterns ignore_patterns = {0};
 
-void add_pattern(const char *pattern) {
-    if (ignore_patterns.capacity == 0)
-        DA_INIT(ignore_patterns, MAX_PATH);
+void add_pattern(char *pattern) {
     DA_ADD(ignore_patterns, pattern);
 }
 
@@ -15,14 +13,21 @@ void load_ignore_patterns() {
     char line[MAX_PATH];
     while (fgets(line, MAX_PATH, file)) {
         line[strcspn(line, "\n")] = 0;
-        add_pattern(line);
+        char *pattern = (char *)malloc(MAX_PATH);
+        strcpy(pattern, line);
+        add_pattern(pattern);
     }
     fclose(file);
 
-    add_pattern(".snaptrack\\");
+    char *pattern = (char *)malloc(MAX_PATH);
+    strcpy(pattern, ".snaptrack\\");
+    add_pattern(pattern);
 }
 
 void free_ignore_patterns() {
+    DA_FOREACH(ignore_patterns, pattern, char *) {
+        free(pattern);
+    }
     DA_FREE(ignore_patterns);
 }
 

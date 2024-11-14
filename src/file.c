@@ -3,7 +3,24 @@
 #include <windows.h>
 #include "file.h"
 
-Files index_files = {0}, path_files = {0};
+Cabinet cabinet = {0};
+
+Files *new_files_entry() {
+    Files *files = (Files *)malloc(sizeof(Files));
+    files->items = NULL;
+    files->capacity = 0;
+    files->count = 0;
+    DA_ADD(cabinet, files);
+    return files;
+}
+
+void cleanup_cabinet() {
+    foreach_files(cabinet, files) {
+        DA_FREE(*files);
+        free(files);
+    }
+    DA_FREE(cabinet);
+}
 
 int is_same_string(const char *string1, const char *string2) {
     return strcmp(string1, string2) == 0;
@@ -22,17 +39,13 @@ FILE *file_open(const char* filepath, const char* mode) {
     return file;
 }
 
-void free_files(Files *files) {
-    DA_FREE(*files);
-}
-
-void get_files_from_path(const char *path) { 
+void get_files_from_path(const char *path, Files *files) {
     if (path[strlen(path)-1] != '\\' && *path != '.') {
-        File new_file = {0};
-        strcpy(new_file.path, path);
-        new_file.status = New;
-        new_file.staged = 0;
-        DA_ADD(path_files, &new_file);
+        File *new_file = (File *)malloc(sizeof(File));
+        strcpy(new_file->path, path);
+        new_file->status = New;
+        new_file->staged = 0;
+        DA_ADD(*files, new_file);
         return;
     }
 
@@ -68,54 +81,28 @@ void get_files_from_path(const char *path) {
         if (is_dir) {
             char new_path[MAX_PATH];
             snprintf(new_path, MAX_PATH, "%s\\%s\\", path, find_data.cFileName);
-            get_files_from_path(new_path);
+            get_files_from_path(new_path, files);
             continue;
         }
 
-        File new_file = {0};
-        strcpy(new_file.path, file_path);
-        new_file.status = New;
-        DA_ADD(path_files, &new_file);
+        File *new_file = (File *)malloc(sizeof(File));
+        strcpy(new_file->path, file_path);
+        new_file->status = New;
+        new_file->staged = 0;
+        DA_ADD(*files, new_file);
     } while (FindNextFile(hFind, &find_data) != 0);
 
     FindClose(hFind);
 }
 
-void add_file(Files *files, File *file) {
-    DA_ADD(*files, file);
-}
-
-void load_index_files(const char *path, Files *files) {
-    FILE *index_file = file_open(path, "r");
-    
-    char line[1024];
-    while (fgets(line, 1024, index_file)) {
-        File new_file = {0};
-        sscanf(line, "%s %s %d", new_file.path, new_file.hash, (int *)&(new_file.status));
-        new_file.staged = 0;
-        
-        add_file(files, &new_file);
-    }
-
-    fclose(index_file);
-}
-
-void init_index_files(const char *path) {
-    load_index_files(path, &index_files);
-}
-
-void free_index_files(Files *files) {
-    free_files(files);
-}
-
-void init_path_files(const char *path) {
+void load_path_files(const char *path, Files *files) {
     load_ignore_patterns();
-    get_files_from_path(path);
+    get_files_from_path(path, files);
     free_ignore_patterns();
 
     init_sha_file();
 
-    foreach_file(path_files, file) {
+    foreach_file(*files, file) {
         file->staged = 0;
         if (!does_dir_exist(file->path)) {
             file->status = Deleted;
@@ -129,8 +116,18 @@ void init_path_files(const char *path) {
     free_sha_file();
 }
 
-void free_path_files() {
-    free_files(&path_files);
+void load_index_files(const char *path, Files *files) {
+    FILE *index_file = file_open(path, "r");
+    
+    char line[1024];
+    while (fgets(line, 1024, index_file)) {
+        File *new_file = (File *)malloc(sizeof(File));
+        sscanf(line, "%s %s %d", new_file->path, new_file->hash, (int *)&(new_file->status));
+        new_file->staged = 0;
+        DA_ADD(*files, new_file);
+    }
+
+    fclose(index_file);
 }
 
 void create_object(File file) {
@@ -151,45 +148,45 @@ int does_dir_exist(const char *path) {
     return _access(path, 0) == 0;
 }
 
-void path_must_be_valid(const char *path) {
+void path_must_exist(const char *path) {
     if (!does_dir_exist(path)) {
         fprintf(stderr, "File or directory %s does not exist\n", path);
         exit(EXIT_FAILURE);
     }
 }
 
-void check_repo_already_exists(const char *repo_path) {
+void check_repo_already_exists() {
     char path[MAX_PATH];
-    snprintf(path, sizeof(path), "%s\\.snaptrack", repo_path);
+    snprintf(path, sizeof(path), "%s\\.snaptrack", REPO_PATH);
     if (does_dir_exist(path)) {
         fprintf(stderr, "A SnapTrack repository already exists at this location.\n");
         exit(EXIT_FAILURE);
     }
 }
 
-void repo_must_exist(const char *repo_path) {
+void repo_must_exist() {
     char path[MAX_PATH];
-    snprintf(path, sizeof(path), "%s\\.snaptrack", repo_path);
+    snprintf(path, sizeof(path), "%s\\.snaptrack", REPO_PATH);
     if (!does_dir_exist(path)) {
         fprintf(stderr, "A SnapTrack repository doesn't exist at this location. Execute 'snaptrack init' before continuing.\n");
         exit(EXIT_FAILURE);
     }
 }
 
-void make_directory(const char *repo_path, const char *subdir) {
-    char path[MAX_PATH];
-    snprintf(path, sizeof(path), "%s\\.snaptrack\\%s", repo_path, subdir);
-    if (_mkdir(path) != 0 && errno != EEXIST) {
+void make_directory(const char *path) {
+    char full_path[MAX_PATH];
+    snprintf(full_path, sizeof(full_path), "%s\\.snaptrack\\%s", REPO_PATH, path);
+    if (_mkdir(full_path) != 0 && errno != EEXIST) {
         fprintf(stderr, "Error at snaptrack init\n");
         perror("Failed to create directory");
         exit(EXIT_FAILURE);
     }
 }
 
-void create_file(const char *repo_path, const char *subpath, const char *content) {
-    char path[MAX_PATH];
-    snprintf(path, sizeof(path), "%s\\.snaptrack\\%s", repo_path, subpath);
-    FILE *file = file_open(path, "w");
+void create_file(const char *path, const char *content) {
+    char full_path[MAX_PATH];
+    snprintf(full_path, sizeof(full_path), "%s\\.snaptrack\\%s", REPO_PATH, path);
+    FILE *file = file_open(full_path, "w");
     if (content) fprintf(file, "%s", content);
     fclose(file);
 }

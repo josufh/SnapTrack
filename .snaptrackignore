@@ -4,5 +4,3 @@
 *.exe
 .vscode\
 test\
-include\
-src\

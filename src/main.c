@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "snaptrack.h"
 #include "config.h"
+#include "file.h"
 
 /*
 TODO asap
@@ -92,5 +93,6 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Unkwon command: %s\n", argv[1]);
         return 1;
     }
+    cleanup_cabinet();
     return 0;
 }

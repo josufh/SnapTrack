@@ -6,26 +6,24 @@
 #include <string.h>
 
 typedef struct DA {
-    void *items;
+    void **items;
     size_t count;
     size_t capacity;
-    size_t item_size;
 } DynamicArray;
 
 #define DA_INIT_CAPACITY 1
 
-#define DA_INIT(da, size) \
+#define DA_INIT(da) \
     do { \
-        (da).items = malloc(size * DA_INIT_CAPACITY); \
+        (da).items = malloc(DA_INIT_CAPACITY*sizeof(void *)); \
         (da).count = 0; \
         (da).capacity = DA_INIT_CAPACITY; \
-        (da).item_size = size; \
     } while (0)
 
 #define DA_RESIZE(da) \
     do { \
         (da).capacity *= 2; \
-        (da).items = realloc((da).items, (da).item_size * (da).capacity); \
+        (da).items = realloc((da).items, (da).capacity * sizeof(void *)); \
         if ((da).items == NULL) { \
             fprintf(stderr, "Memory allocation failed during resizing\n"); \
             exit(EXIT_FAILURE); \
@@ -34,10 +32,9 @@ typedef struct DA {
 
 #define DA_ADD(da, element) \
     do { \
-        if ((da).capacity == 0) { DA_INIT(da, sizeof(typeof(*element))); } \
+        if ((da).capacity == 0) { DA_INIT(da); } \
         else if ((da).count == (da).capacity) { DA_RESIZE(da); } \
-        memcpy(((char *)(da).items) + ((da).count * (da).item_size), element, (da).item_size); \
-        (da).count++; \
+        (da).items[(da).count++] = (element); \
     } while (0)
 
 #define DA_FREE(da)         \
@@ -46,16 +43,15 @@ typedef struct DA {
         (da).items = NULL;  \
         (da).count = 0;     \
         (da).capacity = 0;  \
-        (da).item_size = 0; \
     } while (0)
 
 #define DA_GET(da, index) \
     (((size_t)(index) < (da).count) ? \
-    (void *)((char *)(da).items + ((index)*(da).item_size)) : \
-    (fprintf(stderr, "Error: Index %zu, is out of bounds (0-%zu)\n", (size_t)(index), (da).count-1), exit(EXIT_FAILURE), (void *)NULL))
+    (da).items[index] : \
+    (fprintf(stderr, "Error: Index %zu, is out of bounds (0-%zu)\n", (size_t)(index), (da).count-1), exit(EXIT_FAILURE), NULL))
 
 #define DA_FOREACH(da, var, type) \
     for (size_t _i_##var = 0; _i_##var < (da).count; ++_i_##var) \
-        for (type *var = (type *)((char *)(da).items + _i_##var * (da).item_size); var != NULL; var = NULL)
+        for (type var = (type)(da).items[_i_##var]; var != NULL; var = NULL)
 
 #endif // DYNAMIC_ARRAY_H
