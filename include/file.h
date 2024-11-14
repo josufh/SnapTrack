@@ -9,11 +9,6 @@
 
 #define REPO_PATH "."
 
-void load_function(DLL *dll, const char *library_name, const char *function_name);
-void free_library(DLL *dll);
-
-void sha1_to_hex(unsigned char hash[SHA1_BLOCK_SIZE], char output[SHA1_STRING_SIZE]);
-
 int is_same_string(const char *string1, const char *string2);
 
 typedef enum {
@@ -46,8 +41,6 @@ void get_files_from_path(const char *path);
 File *get_file_at_index(Files files, size_t index);
 
 void create_object(File file);
-
-void print_repo_status();
 
 FILE *file_open(const char* filepath, const char* mode);
 void free_files(Files *files);

@@ -5,56 +5,12 @@
 
 Files index_files = {0}, path_files = {0};
 
-void load_library(DLL *dll, const char *dll_path) {
-    dll->handle = LoadLibrary(dll_path);
-    if (!dll->handle) {
-        fprintf(stderr, "Failed to load %s\n", dll_path);
-        exit(EXIT_FAILURE);
-    }
-}
-
-void load_function(DLL *dll, const char *library_name, const char *function_name) {
-    load_library(dll, library_name);
-    dll->func = (void *)GetProcAddress(dll->handle, function_name);
-    if (!dll->func) {
-        fprintf(stderr, "Failed to locate %s in DLL", function_name);
-        FreeLibrary(dll->handle);
-        exit(EXIT_FAILURE);
-    }
-}
-
-void free_library(DLL *dll) {
-    FreeLibrary(dll->handle);
-}
-
-void sha1_to_hex(unsigned char hash[SHA1_BLOCK_SIZE], char output[SHA1_STRING_SIZE]) {
-    for (int i = 0; i < SHA1_BLOCK_SIZE; i++) {
-        sprintf(output + (i*2), "%02x", hash[i]);
-    }
-    output[SHA1_BLOCK_SIZE*2] = '\0';
-}
-
 int is_same_string(const char *string1, const char *string2) {
     return strcmp(string1, string2) == 0;
 }
 
 File *get_file_at_index(Files files, size_t index) {
     return (File *)DA_GET(files, index);
-}
-
-const char *file_status_string[] = {"Unchanged", "New", "Modified", "Deleted"};
-
-void print_repo_status() {
-    fprintf(stdout, "Staged changes:\n");
-    foreach_file(index_files, file) {
-        fprintf(stdout, "\t%s: %s\n", file_status_string[file->status], file->path);
-    }
-
-    fprintf(stdout, "\nNOT staged changes:\n");
-    foreach_file(path_files, file) {
-        if (!file->staged && file->status != Unchanged)
-            fprintf(stdout, "\t%s: %s\n", file_status_string[file->status], file->path);
-    }
 }
 
 FILE *file_open(const char* filepath, const char* mode) {
@@ -82,7 +38,6 @@ void get_files_from_path(const char *path) {
 
     char search_path[MAX_PATH];
     snprintf(search_path, MAX_PATH, "%s\\*", path);
-
 
     WIN32_FIND_DATA find_data;
     HANDLE hFind;
@@ -130,36 +85,23 @@ void add_file(Files *files, File *file) {
     DA_ADD(*files, file);
 }
 
-void init_index_files(const char *path) {
-    FILE *index_file = file_open(path, "r");
-    
-    char line[1024];
-    while (fgets(line, 1024, index_file)) {
-        File new_file = {0};
-        sscanf(line, "%s %s", new_file.path, new_file.hash);
-        new_file.staged = 1;
-        new_file.status = New;
-        
-        add_file(&index_files, &new_file);
-    }
-
-    fclose(index_file);
-}
-
 void load_index_files(const char *path, Files *files) {
     FILE *index_file = file_open(path, "r");
     
     char line[1024];
     while (fgets(line, 1024, index_file)) {
         File new_file = {0};
-        sscanf(line, "%s %s", new_file.path, new_file.hash);
+        sscanf(line, "%s %s %d", new_file.path, new_file.hash, (int *)&(new_file.status));
         new_file.staged = 0;
-        new_file.status = Deleted;
         
         add_file(files, &new_file);
     }
 
     fclose(index_file);
+}
+
+void init_index_files(const char *path) {
+    load_index_files(path, &index_files);
 }
 
 void free_index_files(Files *files) {
@@ -171,9 +113,7 @@ void init_path_files(const char *path) {
     get_files_from_path(path);
     free_ignore_patterns();
 
-    DLL sha1_dll;
-    load_function(&sha1_dll, "sha1.dll", "sha1_file");
-    SHA1FileFunc sha1_file = (SHA1FileFunc)sha1_dll.func;
+    init_sha_file();
 
     foreach_file(path_files, file) {
         file->staged = 0;
@@ -181,12 +121,12 @@ void init_path_files(const char *path) {
             file->status = Deleted;
         } else {
             unsigned char hash[SHA1_BLOCK_SIZE];
-            sha1_file(file->path, hash);
+            sha_file(file->path, hash);
             sha1_to_hex(hash, file->hash);
         }
     }
     
-    free_library(&sha1_dll);
+    free_sha_file();
 }
 
 void free_path_files() {

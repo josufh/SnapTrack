@@ -50,9 +50,9 @@ typedef struct DA {
     } while (0)
 
 #define DA_GET(da, index) \
-    (((index) >= 0 && (index) < (da).count) ? \
+    (((size_t)(index) < (da).count) ? \
     (void *)((char *)(da).items + ((index)*(da).item_size)) : \
-    (fprintf(stderr, "Error: Index %d, is out of bounds (0-%d)\n", (index), (da).count-1), exit(EXIT_FAILURE), (void *)NULL))
+    (fprintf(stderr, "Error: Index %zu, is out of bounds (0-%zu)\n", (size_t)(index), (da).count-1), exit(EXIT_FAILURE), (void *)NULL))
 
 #define DA_FOREACH(da, var, type) \
     for (size_t _i_##var = 0; _i_##var < (da).count; ++_i_##var) \

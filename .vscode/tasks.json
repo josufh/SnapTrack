@@ -12,7 +12,10 @@
                 "src\\*.c",
                 "-Iinclude",
                 "-L.",
-                "-lsha1"
+                "-lsha1"/* ,
+                "-Wall",
+                "-Wextra",
+                "-Werror" */
             ],
             "group": {
                 "kind": "build",

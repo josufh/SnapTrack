@@ -14,8 +14,9 @@ char *get_config_file_path() {
 
     char config_path[MAX_PATH];
     snprintf(config_path, MAX_PATH, "%s\\SnapTrack", app_data_path);
-    char *config_file_path = (char *)malloc(MAX_PATH);
-    snprintf(config_file_path, MAX_PATH, "%s\\config", config_path);
+    size_t config_file_path_size = strlen(config_path) + 9;
+    char *config_file_path = (char *)malloc(config_file_path_size);
+    snprintf(config_file_path, config_file_path_size, "%s\\config", config_path);
     
     if (!does_dir_exist(config_path)) {
         _mkdir(config_path);
@@ -31,14 +32,14 @@ void set_config(const char* element, const char *new_value) {
     char *config_file_path = get_config_file_path();
     FILE *config_file = file_open(config_file_path, "r");
 
-    char lines[CONFIG_ELEMENT_COUNT][255] = {0};
+    char lines[CONFIG_ELEMENT_COUNT][256] = {0};
     int line_count = 0;
     if (config_file) {
-        while (fgets(lines[line_count], 255, config_file)) {
-            char key[255], old_value[255];
-            sscanf(lines[line_count], "%s %s", key, old_value);
+        while (fgets(lines[line_count], 256, config_file)) {
+            char key[256] = {0}, old_value[256] = {0};
+            sscanf(lines[line_count], "%255s %255s", key, old_value);
             if (strcmp(key, element) == 0) {
-                snprintf(lines[line_count], 255, "%s %s\n", key, new_value);
+                snprintf(lines[line_count], 256, "%s %s\n", key, new_value);
             }
             line_count++;
         }

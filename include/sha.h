@@ -14,5 +14,11 @@ typedef struct {
 } DLL;
 
 extern DLL sha_dll;
+extern SHA1FileFunc sha_file;
+
+void init_sha_file();
+void free_sha_file();
+
+void sha1_to_hex(unsigned char hash[SHA1_BLOCK_SIZE], char output[SHA1_STRING_SIZE]);
 
 #endif // SHA_H 
