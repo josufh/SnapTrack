@@ -12,6 +12,7 @@ typedef enum {
     Config,
     Revert,
     Branch,
+    Checkout,
     UnknownCommand
 } Command;
 
@@ -33,12 +34,12 @@ typedef struct {
 } Commit;
 
 void commit_changes(const char *commit_message);
-void get_commit_info(Commit *commit, const char *commit_hash);
 void list_commits();
 void revert_commit(const char *revert_hash);
-void current_branch();
+char *current_branch();
 void create_branch(const char *branch_name);
 void list_branches();
 void delete_branch(const char *branch_name_to_delete);
+void checkout_branch(const char *branch_name);
 
 #endif // SNAPTRACK_H

@@ -5,8 +5,7 @@
 #include "dynamic_array.h"
 #include "ignore.h"
 #include "sha.h"
-
-#define REPO_PATH "."
+#include "path.h"
 
 int is_same_string(const char *string1, const char *string2);
 

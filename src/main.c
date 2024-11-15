@@ -3,23 +3,9 @@
 #include "config.h"
 #include "print.h"
 
-/*
-TODO asap
-revert add
-
-TODO later
-not commit if last commit index is same
-snapshot clean (clean blobs that arent used, clean after commit)
-revert -soft -hard?
-no revert if last commit
-redmine(進捗管理)
-
-
-*/
-
 int main(int argc, char *argv[]) {
     if (argc < 2)
-        exit_error("show error message");
+        exit_error("show snaptrack usage\n");
 
     switch (which_command(argv[1])) {
     case Init:
@@ -80,15 +66,24 @@ int main(int argc, char *argv[]) {
 
     case Branch:
         if (argc < 3) {
-            current_branch();
-            break;
-        }
-        if (strcmp(argv[2], "-l") == 0) {
+            print_out(White, "Current branch: %s\n", current_branch());
+
+        } else if (strcmp(argv[2], "-l") == 0) {
             list_branches();
+
         } else if (strcmp(argv[2], "-d") == 0 && argc > 3) {
             delete_branch(argv[3]);
+            // Control -d if no argument passed
         } else {
             create_branch(argv[2]);
+        }
+        break;
+
+    case Checkout:
+        if (argc < 3) {
+            list_branches();
+        } else {
+            checkout_branch(argv[2]);
         }
         break;
 

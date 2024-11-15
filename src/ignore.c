@@ -8,6 +8,10 @@ void add_pattern(char *pattern) {
 }
 
 void load_ignore_patterns() {
+    char *pattern = malloc_string(MAX_PATH);
+    strcpy(pattern, ".snaptrack\\");
+    add_pattern(pattern);
+
     FILE *file = fopen(".snaptrackignore", "r");
     if (!file) return;
 
@@ -19,10 +23,6 @@ void load_ignore_patterns() {
         add_pattern(pattern);
     }
     fclose(file);
-
-    char *pattern = malloc_string(MAX_PATH);
-    strcpy(pattern, ".snaptrack\\");
-    add_pattern(pattern);
 }
 
 void free_ignore_patterns() {

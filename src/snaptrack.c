@@ -10,6 +10,7 @@
 #include "snaptrack.h"
 #include "ignore.h"
 #include "branch.h"
+#include "commit.h"
 
 Command which_command(const char *command) {
     if (is_same_string(command, "init")) return Init;
@@ -20,6 +21,7 @@ Command which_command(const char *command) {
     else if (is_same_string(command, "config")) return Config;
     else if (is_same_string(command, "revert")) return Revert;
     else if (is_same_string(command, "branch")) return Branch;
+    else if (is_same_string(command, "checkout")) return Checkout;
     else return UnknownCommand;
 }
 
@@ -141,6 +143,21 @@ void check_status() {
         if (L->status == Deleted && !L->staged)
             print_out(Red, "\t%s: %s\n", file_status_string[L->status], L->path);
     }
+}
+
+int are_there_changes() {
+    Files *repo_files = new_files_entry();
+    load_path_files(REPO_PATH, repo_files);
+    Files *last_files = new_files_entry();
+    get_last_commit_index(last_files);
+
+    if (repo_files->count != last_files->count) return 1;
+
+    foreach_file(*repo_files, R)
+        foreach_file(*last_files, L) {
+            if (is_same_string(R->path, L->path) && !is_same_string(R->hash, L->hash)) return 1;
+        }
+    return 0;
 }
 
 // Stage
@@ -467,25 +484,24 @@ void revert_commit(const char *revert_hash) {
 }
 
 // Branch
-void get_current_branch_path(char *branch_string) {
+void current_branch_path(char *branch_path) {
     char head_path[MAX_PATH];
     snprintf(head_path, MAX_PATH, "%s\\.snaptrack\\HEAD", REPO_PATH);
     FILE *head_file = file_open(head_path, "r");
-
-    char line[MAX_PATH];
-    fgets(line, MAX_PATH, head_file);
-    strcpy(branch_string, line);
+    fscanf(head_file, "%s", branch_path);
+    fclose(head_file);
 }
 
-void current_branch() {
+char *current_branch() {
     repo_must_exist(REPO_PATH);
-    char branch_path[MAX_PATH];
-    get_current_branch_path(branch_path);
 
-    char branch_name[256];
+    char branch_path[MAX_PATH];
+    current_branch_path(branch_path);
+
+    static char branch_name[256];
     strcpy(branch_name, strrchr(branch_path, '\\')+1);
 
-    fprintf(stdout, "Current branch: %s\n", branch_name);
+    return branch_name;
 }
 
 void list_branches() {
@@ -546,7 +562,7 @@ void create_branch(const char *branch_name) {
     }
 
     char current_branch_relative_path[MAX_PATH];
-    get_current_branch_path(current_branch_relative_path);
+    current_branch_path(current_branch_relative_path);
     char current_branch_path[MAX_PATH];
     snprintf(current_branch_path, MAX_PATH, "%s\\.snaptrack\\%s", REPO_PATH, current_branch_relative_path);
     FILE *current_branch_file = file_open(current_branch_path, "r");
@@ -573,7 +589,7 @@ void create_branch(const char *branch_name) {
 void delete_branch(const char *branch_name_to_delete) {
     repo_must_exist(REPO_PATH);
     char branch_path[MAX_PATH];
-    get_current_branch_path(branch_path);
+    current_branch_path(branch_path);
 
     char branch_name[256];
     strcpy(branch_name, strrchr(branch_path, '\\')+1);
@@ -587,4 +603,38 @@ void delete_branch(const char *branch_name_to_delete) {
     snprintf(branch_file_path_to_delete, MAX_PATH, "%s\\.snaptrack\\refs\\branches\\%s", REPO_PATH, branch_name_to_delete);
 
     remove(branch_file_path_to_delete);
+}
+
+void checkout_branch(const char *branch_name) {
+    repo_must_exist(REPO_PATH);
+
+    if (are_there_changes())
+        exit_error("Uncommited changes in current branch\nCommit changes before changing branch or restore to previous commit\n");
+    
+    Files *branch_files = new_files_entry();
+    get_branch_index_files(branch_name, branch_files);
+
+    Files *current_files = new_files_entry();
+    get_branch_index_files(current_branch(), current_files);
+
+    foreach_file(*current_files, C) {
+        foreach_file(*branch_files, B) {
+            if (same_file(C, B)) {
+                C->staged = 1; B->staged = 1;
+                _i_B = branch_files->count;
+            }
+        }
+        if (!C->staged)
+            remove(C->path);
+    }
+
+    foreach_file(*branch_files, B) {
+        if (!B->staged) {
+            create_src_from_object(B);
+        }
+    }
+
+    rewrite_index_file(branch_files);
+
+    change_head(branch_name);
 }

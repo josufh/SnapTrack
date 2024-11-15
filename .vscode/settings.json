@@ -26,6 +26,13 @@
         "string_view": "c",
         "initializer_list": "c",
         "span": "c",
-        "branch.h": "c"
+        "branch.h": "c",
+        "print.h": "c",
+        "path.h": "c",
+        "memory": "c",
+        "optional": "c",
+        "system_error": "c",
+        "text_encoding": "c",
+        "commit.h": "c"
     }
 }
