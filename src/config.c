@@ -15,7 +15,7 @@ char *get_config_file_path() {
     char config_path[MAX_PATH];
     snprintf(config_path, MAX_PATH, "%s\\SnapTrack", app_data_path);
     size_t config_file_path_size = strlen(config_path) + 9;
-    char *config_file_path = (char *)malloc(config_file_path_size);
+    char *config_file_path = malloc_string(config_file_path_size);
     snprintf(config_file_path, config_file_path_size, "%s\\config", config_path);
     
     if (!does_dir_exist(config_path)) {

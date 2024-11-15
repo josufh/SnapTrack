@@ -35,10 +35,11 @@ extern Cabinet cabinet;
 Files *new_files_entry();
 void cleanup_cabinet();
 
+File *malloc_file();
+char *malloc_string(size_t size);
+
 void load_index_files(const char *path, Files *files);
 void load_path_files(const char *path, Files *files);
-
-File *get_file_at_index(Files files, size_t index);
 
 void create_object(File file);
 

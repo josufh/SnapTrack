@@ -1,4 +1,5 @@
 #include "ignore.h"
+#include "file.h"
 
 IgnorePatterns ignore_patterns = {0};
 
@@ -13,13 +14,13 @@ void load_ignore_patterns() {
     char line[MAX_PATH];
     while (fgets(line, MAX_PATH, file)) {
         line[strcspn(line, "\n")] = 0;
-        char *pattern = (char *)malloc(MAX_PATH);
+        char *pattern = malloc_string(MAX_PATH);
         strcpy(pattern, line);
         add_pattern(pattern);
     }
     fclose(file);
 
-    char *pattern = (char *)malloc(MAX_PATH);
+    char *pattern = malloc_string(MAX_PATH);
     strcpy(pattern, ".snaptrack\\");
     add_pattern(pattern);
 }

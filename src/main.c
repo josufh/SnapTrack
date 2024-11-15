@@ -30,11 +30,18 @@ int main(int argc, char *argv[]) {
         check_status();
         break;
 
-    case Add:
+    case Stage:
         if (argc < 3) {
-            exit_error("Wrong usage: snaptrack add <file/dir name>\n");
+            exit_error("Wrong usage: snaptrack stage <file/dir name>\n");
         }
         stage_files(argv[2]);
+        break;
+
+    case Unstage:
+        if (argc < 3) {
+            exit_error("Wrong usage: snaptrack unstage <file/dir name>\n");
+        }
+        unstage_files(argv[2]);
         break;
 
     case CommitChanges:

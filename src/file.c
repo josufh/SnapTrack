@@ -26,22 +26,25 @@ int is_same_string(const char *string1, const char *string2) {
     return strcmp(string1, string2) == 0;
 }
 
-File *get_file_at_index(Files files, size_t index) {
-    return (File *)DA_GET(files, index);
+File *malloc_file() {
+    return (File *)malloc(sizeof(File));
+}
+
+char *malloc_string(size_t size) {
+    return (char *)malloc(size);
 }
 
 FILE *file_open(const char* filepath, const char* mode) {
     FILE *file = fopen(filepath, mode);
     if (!file) {
-        fprintf(stderr, "Failed to open file: %s\n", filepath);
-        exit(EXIT_FAILURE);
+        exit_error("Failed to open file: %s\n", filepath);
     }
     return file;
 }
 
 void get_files_from_path(const char *path, Files *files) {
     if (path[strlen(path)-1] != '\\' && *path != '.') {
-        File *new_file = (File *)malloc(sizeof(File));
+        File *new_file = malloc_file();
         strcpy(new_file->path, path);
         new_file->status = New;
         new_file->staged = 0;
@@ -85,7 +88,7 @@ void get_files_from_path(const char *path, Files *files) {
             continue;
         }
 
-        File *new_file = (File *)malloc(sizeof(File));
+        File *new_file = malloc_file();
         strcpy(new_file->path, file_path);
         new_file->status = New;
         new_file->staged = 0;
@@ -121,7 +124,7 @@ void load_index_files(const char *path, Files *files) {
     
     char line[1024];
     while (fgets(line, 1024, index_file)) {
-        File *new_file = (File *)malloc(sizeof(File));
+        File *new_file = malloc_file();
         sscanf(line, "%s %s %d", new_file->path, new_file->hash, (int *)&(new_file->status));
         new_file->staged = 0;
         DA_ADD(*files, new_file);
@@ -159,8 +162,7 @@ void check_repo_already_exists() {
     char path[MAX_PATH];
     snprintf(path, sizeof(path), "%s\\.snaptrack", REPO_PATH);
     if (does_dir_exist(path)) {
-        fprintf(stderr, "A SnapTrack repository already exists at this location.\n");
-        exit(EXIT_FAILURE);
+        exit_error("A SnapTrack repository already exists at this location.\n");
     }
 }
 
@@ -177,9 +179,7 @@ void make_directory(const char *path) {
     char full_path[MAX_PATH];
     snprintf(full_path, sizeof(full_path), "%s\\.snaptrack\\%s", REPO_PATH, path);
     if (_mkdir(full_path) != 0 && errno != EEXIST) {
-        fprintf(stderr, "Error at snaptrack init\n");
-        perror("Failed to create directory");
-        exit(EXIT_FAILURE);
+        exit_error("Error creating directory %s\n", path);
     }
 }
 

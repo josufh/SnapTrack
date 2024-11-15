@@ -14,7 +14,8 @@
 Command which_command(const char *command) {
     if (is_same_string(command, "init")) return Init;
     else if (is_same_string(command, "status")) return Status;
-    else if (is_same_string(command, "add")) return Add;
+    else if (is_same_string(command, "stage")) return Stage;
+    else if (is_same_string(command, "unstage")) return Unstage;
     else if (is_same_string(command, "commit")) return CommitChanges;
     else if (is_same_string(command, "config")) return Config;
     else if (is_same_string(command, "revert")) return Revert;
@@ -35,7 +36,7 @@ void init_repository() {
     create_file("HEAD", "refs\\branches\\main");
     create_file("index", NULL);
 
-    fprintf(stdout, "Initialized local empty SnapTrack repository\n");
+    print_out(Green, "Initialized local empty SnapTrack repository\n");
 }
 
 // Status
@@ -125,20 +126,20 @@ void check_status() {
 
     const char *file_status_string[] = {"Unchanged", "New", "Modified", "Deleted"};
 
-    fprintf(stdout, "Staged for commit:\n");
+    print_out(White, "Staged for commit:\n");
     foreach_file(*index_files, I) {
         if (I->status != Unchanged)
-            fprintf(stdout, "\t%s: %s\n", file_status_string[I->status], I->path);
+            print_out(Green, "\t%s: %s\n", file_status_string[I->status], I->path);
     }
 
-    fprintf(stdout, "\nNot staged:\n");
+    print_out(White, "\nNot staged:\n");
     foreach_file(*path_files, R) {
         if (R->status != Unchanged && !R->staged)
-            fprintf(stdout, "\t%s: %s\n", file_status_string[R->status], R->path);
+            print_out(Red, "\t%s: %s\n", file_status_string[R->status], R->path);
     }
     foreach_file(*last_files, L) {
         if (L->status == Deleted && !L->staged)
-            fprintf(stdout, "\t%s: %s\n", file_status_string[L->status], L->path);
+            print_out(Red, "\t%s: %s\n", file_status_string[L->status], L->path);
     }
 }
 
@@ -165,22 +166,21 @@ void stage_files(const char *to_stage_path) {
                 index_file->staged = 1;
                 if (to_stage_file->status == Deleted) {
                     fprintf(temp_file, "%s %s %d\n", index_file->path, index_file->hash, Deleted);
-                    printf("Staging deletion of file: %s\n", index_file->path);
+                    print_out(Red, "Staging deletion of file: %s\n", index_file->path);
                 } else if (!is_same_string(to_stage_file->hash, index_file->hash)) {
-                    // new hash
-                    printf("Staging modification of file %s with hash %s\n", to_stage_file->path, to_stage_file->hash);
+                    print_out(Yellow, "Staging modification of file %s with hash %s\n", to_stage_file->path, to_stage_file->hash);
                     to_stage_file->status = Modified;
                     fprintf(temp_file, "%s %s %d\n", to_stage_file->path, to_stage_file->hash, Modified);
                     create_object(*to_stage_file);
                 } else {
-                    fprintf(temp_file, "%s %s %d\n", to_stage_file->path, to_stage_file->hash, Unchanged);
+                    fprintf(temp_file, "%s %s %d\n", index_file->path, index_file->hash, index_file->status);
                     to_stage_file->status = Unchanged;
                 }
             }
         }
         if (!index_file->staged) {
             if (strncmp(index_file->path, to_stage_path, strlen(to_stage_path)) == 0 && !does_dir_exist(index_file->path)) {
-                printf("Staging deletion of file: %s\n", index_file->path);
+                print_out(Red, "Staging deletion of file: %s\n", index_file->path);
                 fprintf(temp_file, "%s %s %d\n", index_file->path, index_file->hash, Deleted);
             } else {
                 fprintf(temp_file, "%s %s %d\n", index_file->path, index_file->hash, index_file->status);
@@ -193,6 +193,42 @@ void stage_files(const char *to_stage_path) {
             print_out(Green, "Staging new file %s with hash %s\n", path_file->path, path_file->hash);
             create_object(*path_file);
             fprintf(temp_file, "%s %s %d\n", path_file->path, path_file->hash, New);
+        }
+    }
+
+    fclose(temp_file);
+    remove(index_path);
+    rename(temp_path, index_path);
+}
+
+// Unstage
+void unstage_files(const char *to_unstage_path) {
+    repo_must_exist(REPO_PATH);
+
+    Files *to_unstage_files = new_files_entry();
+    load_path_files(to_unstage_path, to_unstage_files);
+
+    Files *index_files = new_files_entry();
+    char index_path[MAX_PATH];
+    snprintf(index_path, MAX_PATH, "%s\\.snaptrack\\index", REPO_PATH);
+    load_index_files(index_path, index_files);
+
+    char temp_path[MAX_PATH];
+    snprintf(temp_path, MAX_PATH, "%s\\.snaptrack\\temp_index", REPO_PATH);
+    FILE *temp_file = file_open(temp_path, "w");
+
+    print_out(White, "Unstaged files:\n");
+    foreach_file(*index_files, I) {
+        int found = 0;
+        foreach_file(*to_unstage_files, R) {
+            if (is_same_string(I->path, R->path)) {
+                found = 1;
+                print_out(Yellow, "\t%s\n", I->path);
+                _i_R = to_unstage_files->count;
+            }
+        }
+        if (!found) {
+            fprintf(temp_file, "%s %s %d\n", I->path, I->hash, I->status);
         }
     }
 
@@ -464,7 +500,7 @@ void list_branches() {
     struct dirent *entry;
     while((entry = readdir(dir)) != NULL) {
         if (is_same_string(entry->d_name, ".") || is_same_string(entry->d_name, "..")) continue;
-        char *branch = (char *)malloc(entry->d_namlen);
+        char *branch = malloc_string(entry->d_namlen);
         strcpy(branch, entry->d_name);
         DA_ADD(branches, branch);
     }
@@ -489,7 +525,7 @@ void create_branch(const char *branch_name) {
     struct dirent *entry;
     while((entry = readdir(dir)) != NULL) {
         if (is_same_string(entry->d_name, ".") || is_same_string(entry->d_name, "..")) continue;
-        char *branch = (char *)malloc(entry->d_namlen);
+        char *branch = malloc_string(entry->d_namlen);
         strcpy(branch, entry->d_name);
         DA_ADD(branches, branch);
     }
