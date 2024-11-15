@@ -105,7 +105,7 @@ void load_path_files(const char *path, Files *files) {
 
     init_sha_file();
 
-    foreach_file(*files, file) {
+    foreach_file(files, file) {
         file->staged = 0;
         if (!does_dir_exist(file->path)) {
             file->status = Deleted;

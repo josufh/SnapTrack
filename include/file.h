@@ -24,7 +24,7 @@ typedef struct {
 } File;
 
 typedef DynamicArray Files;
-#define foreach_file(files, file) DA_FOREACH(files, file, File *)
+#define foreach_file(files, file) DA_FOREACH((*files), file, File *)
 #define files_get(files, index) DA_GET(fiels, index)
 
 typedef DynamicArray Cabinet;

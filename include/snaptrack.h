@@ -21,18 +21,6 @@ void init_repository();
 void stage_files(const char *to_stage);
 void unstage_files(const char *to_stage);
 void check_status();
-
-typedef struct {
-    char index_hash[SHA1_STRING_SIZE];
-    char parent[SHA1_STRING_SIZE];
-    char hash[SHA1_STRING_SIZE];
-    char author_name[256];
-    char author_email[256];
-    char author_userid[256];
-    char message[512];
-    time_t timestamp;
-} Commit;
-
 void commit_changes(const char *commit_message);
 void list_commits();
 void revert_commit(const char *revert_hash);

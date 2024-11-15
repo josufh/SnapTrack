@@ -14,5 +14,7 @@ int does_branch_exist(const char *branch_name);
 void get_branch_commit_hash(const char* branch, char *hash);
 void get_branch_index_files(const char *branch, Files *index_files);
 void change_head(const char *branch);
+char *current_branch();
+void current_branch_path(char *branch_path);
 
 #endif // BRANCH_H

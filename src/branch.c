@@ -54,3 +54,21 @@ void change_head(const char *branch) {
     fclose(head_file);
 }
 
+void current_branch_path(char *branch_path) {
+    FILE *head_file = file_open(HEAD_PATH, "r");
+    fscanf(head_file, "%s", branch_path);
+    fclose(head_file);
+}
+
+char *current_branch() {
+    repo_must_exist(REPO_PATH);
+
+    char branch_path[MAX_PATH];
+    current_branch_path(branch_path);
+
+    static char branch_name[256];
+    strcpy(branch_name, strrchr(branch_path, '\\')+1);
+
+    return branch_name;
+}
+
