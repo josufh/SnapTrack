@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
         if (argc < 3) {
             exit_error("Wrong usage: snaptrack revert <commit hash>\n");
         }
-        //revert_commit(argv[2]);
+        revert_commit(argv[2]);
         break;
 
     case Branch:

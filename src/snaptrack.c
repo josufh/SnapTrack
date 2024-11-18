@@ -305,30 +305,20 @@ void revert_commit(const char *revert_hash) {
     Files *repo_files = get_path_files(REPO_PATH);
 
     foreach_file(revert_files, revert_file) {
-        char blob_path[MAX_PATH];
-        snprintf(blob_path, MAX_PATH, "%s\\.snaptrack\\objects\\%s", REPO_PATH, revert_file->hash);
-        FILE *read = file_open(blob_path, "r");
-        FILE *write = file_open(revert_file->path, "w");
-
-        char buffer[1024];
-        size_t bytes;
-
-        while ((bytes = fread(buffer, 1, sizeof(buffer), read)) > 0) {
-            fwrite(buffer, 1, bytes, write);
-        }
-
-        fclose(read); fclose(write);
+        revert_file->staged = 0;
+        char *object_path = new_path("%s%s",OBJECTS_PATH, revert_file->hash);
+        copy_file(revert_file->path, object_path);
 
         foreach_file(repo_files, repo_file) {
             if (same_path(revert_file, repo_file)) {
-                //repo_file->status = Staged;
-                break;
+                repo_file->staged = 1;
+                _i_repo_file = repo_files->count;
             }
         }
     }
 
     foreach_file(repo_files, repo_file) {
-        if (repo_file->status == New) {
+        if (!repo_file->staged) {
             remove(repo_file->path);
         }
     }

@@ -9,6 +9,7 @@ char *malloc_string(size_t size) {
     char *string = (char *)malloc(size);
     if (!string)
         exit_error("Error allocatig memory @ malloc_string\n");
+    memset(string, 0, size);
     return string;
 }
 
