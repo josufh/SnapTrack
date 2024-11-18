@@ -142,7 +142,9 @@ void stage_files(const char *to_stage_path) {
             }
         }
         if (!index_file->staged) {
-            if (strncmp(index_file->path, to_stage_path, strlen(to_stage_path)) == 0 && !does_dir_exist(index_file->path)) {
+            int cond1 = strncmp(index_file->path, to_stage_path, strlen(to_stage_path)) == 0 && !does_dir_exist(index_file->path);
+            int cond2 = same_string(to_stage_path, ".") && !does_dir_exist(index_file->path);
+            if (cond1 || cond2) {
                 // Stage deletion (for dir stage)
                 fprintf(temp_file, "%s %s %d\n", index_file->path, index_file->hash, Deleted);
                 print_out(Red, "Staging deletion of file: %s\n", index_file->path);
