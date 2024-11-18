@@ -13,6 +13,7 @@ typedef enum {
     Revert,
     Branch,
     Checkout,
+    Merge,
     UnknownCommand
 } Command;
 
@@ -28,5 +29,6 @@ void create_branch(const char *branch_name);
 void list_branches();
 void delete_branch(const char *branch_name_to_delete);
 void checkout_branch(const char *branch_name);
+void merge_branch(const char *branching_name);
 
 #endif // SNAPTRACK_H

@@ -22,6 +22,7 @@ Command which_command(const char *command) {
     else if (same_string(command, "revert")) return Revert;
     else if (same_string(command, "branch")) return Branch;
     else if (same_string(command, "checkout")) return Checkout;
+    else if (same_string(command, "merge")) return Merge;
     else return UnknownCommand;
 }
 
@@ -389,7 +390,7 @@ void delete_branch(const char *to_delete_branch_name) {
 }
 
 void checkout_branch(const char *branch_name) {
-    repo_must_exist(REPO_PATH);
+    repo_must_exist();
 
     if (are_there_changes())
         exit_error("Uncommited changes in current branch\nCommit changes before changing branch or restore to previous commit\n");
@@ -418,4 +419,22 @@ void checkout_branch(const char *branch_name) {
     rewrite_index_file(branch_files);
 
     change_head(branch_name);
+}
+
+// Merge
+void merge_branch(const char *branching_name) {
+    repo_must_exist();
+
+    if (!does_branch_exist(branching_name))
+        exit_error("Branch with name %s does not exist\n", branching_name);
+
+    const char *current_branch = get_current_branch_name();
+    
+    if (same_string(current_branch, branching_name))
+        exit_error("%s is current branch\n", branching_name);
+
+    if (are_there_changes())
+        exit_error("Uncommited changes in current branch\nCommit changes before merging or restore to previous commit\n");
+
+    
 }
