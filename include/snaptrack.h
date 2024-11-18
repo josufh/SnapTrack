@@ -24,7 +24,6 @@ void check_status();
 void commit_changes(const char *commit_message);
 void list_commits();
 void revert_commit(const char *revert_hash);
-char *current_branch();
 void create_branch(const char *branch_name);
 void list_branches();
 void delete_branch(const char *branch_name_to_delete);

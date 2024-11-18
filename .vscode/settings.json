@@ -33,6 +33,7 @@
         "optional": "c",
         "system_error": "c",
         "text_encoding": "c",
-        "commit.h": "c"
+        "commit.h": "c",
+        "sha.h": "c"
     }
 }

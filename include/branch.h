@@ -6,15 +6,16 @@
 #include "file.h"
 
 typedef DynamicArray Branches;
-#define foreach_branch(branches, branch) DA_FOREACH(branches, branch, char *)
-#define free_branches(branches) DA_FREE(branches)
-#define add_branch(branches, branch) DA_ADD(branches, branch)
+#define foreach_branch(branches, branch) DA_FOREACH((*branches), branch, char *)
+#define add_branch(branches, branch) DA_ADD((*branches), branch)
 
+Branches *get_branches();
+void free_branches(Branches *branches);
 int does_branch_exist(const char *branch_name);
-void get_branch_commit_hash(const char* branch, char *hash);
-void get_branch_index_files(const char *branch, Files *index_files);
+char *get_branch_commit_hash(const char* branch);
+Files *get_branch_index_files(const char *branch);
 void change_head(const char *branch);
-char *current_branch();
-void current_branch_path(char *branch_path);
+char *get_current_branch_name();
+char *get_current_branch_path();
 
 #endif // BRANCH_H

@@ -4,16 +4,15 @@
 #include <direct.h>
 #include "config.h"
 #include "file.h"
+#include "print.h"
 
 char *get_config_file_path() {
     char *app_data_path = getenv("APPDATA");
     if (!app_data_path) {
-        fprintf(stderr, "Error: APPDATA environment variable not found\n");
-        exit(EXIT_FAILURE);
+        exit_error("Error: APPDATA environment variable not found\n");
     }
 
-    char config_path[MAX_PATH];
-    snprintf(config_path, MAX_PATH, "%s\\SnapTrack", app_data_path);
+    char *config_path = new_path("%s\\SnapTrack", app_data_path);
     size_t config_file_path_size = strlen(config_path) + 9;
     char *config_file_path = malloc_string(config_file_path_size);
     snprintf(config_file_path, config_file_path_size, "%s\\config", config_path);

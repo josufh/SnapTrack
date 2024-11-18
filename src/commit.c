@@ -5,25 +5,26 @@
 #include "branch.h"
 
 FILE* obj_file_open(const char *hash, const char *mode) {
-    char path[MAX_PATH];
-    snprintf(path, MAX_PATH, "%s%s", OBJECTS_PATH, hash);
+    char *path = new_path("%s%s", OBJECTS_PATH, hash);
     return file_open(path, mode);
 }
 
-void get_index_hash_from_commit_hash(const char *commit_hash, char *index_hash) {
+char *get_index_hash_from_commit_hash(const char *commit_hash) {
     FILE *commit_file = obj_file_open(commit_hash, "r");
-
+    
+    char *index_hash = new_hash(NULL);
     char _[256] = {0};
     fscanf(commit_file, "%s", _);
     fscanf(commit_file, "%s", index_hash);
 
     fclose(commit_file);
+
+    return index_hash;
 }
 
-void load_index_files_from_index_hash(const char *hash, Files *files) {
-    char path[MAX_PATH];
-    snprintf(path, MAX_PATH, "%s%s", OBJECTS_PATH, hash);
-    load_index_files(path, files);
+Files *get_index_files_from_index_hash(const char *hash) {
+    char *path = new_path("%s%s", OBJECTS_PATH, hash);
+    return get_index_files(path);
 }
 
 void create_src_from_object(File *file) {
@@ -52,24 +53,20 @@ void rewrite_index_file(Files *files) {
 }
 
 int are_there_changes() {
-    Files *repo_files = new_files_entry();
-    load_path_files(REPO_PATH, repo_files);
-    Files *last_files = new_files_entry();
-    get_branch_index_files(current_branch(), last_files);
+    Files *repo_files = get_path_files(REPO_PATH);
+    Files *last_files = get_branch_index_files(get_current_branch_name());
 
     if (repo_files->count != last_files->count) return 1;
 
-    foreach_file(repo_files, R)
-        foreach_file(last_files, L) {
-            if (is_same_string(R->path, L->path) && !is_same_string(R->hash, L->hash)) return 1;
+    foreach_file(repo_files, repo_file)
+        foreach_file(last_files, last_file) {
+            if (same_file(repo_file, last_file) && !same_hash(repo_file, last_file)) return 1;
         }
     return 0;
 }
 
 void get_commit_info(Commit *commit, const char *commit_hash) {
-    char object_path[MAX_PATH];
-    snprintf(object_path, MAX_PATH, "%s%s", OBJECTS_PATH, commit_hash);
-    FILE *object_file = file_open(object_path, "rb");
+    FILE *object_file = obj_file_open(commit_hash, "rb");
 
     strcpy(commit->hash, commit_hash);
 

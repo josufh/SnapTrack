@@ -2,11 +2,12 @@
 #include "snaptrack.h"
 #include "config.h"
 #include "print.h"
+#include "branch.h"
 
 int main(int argc, char *argv[]) {
     if (argc < 2)
         exit_error("show snaptrack usage\n");
-
+    init_sha_file();
     switch (which_command(argv[1])) {
     case Init:
         init_repository();
@@ -59,21 +60,23 @@ int main(int argc, char *argv[]) {
     case Revert:
         if (argc < 3) {
             exit_error("Wrong usage: snaptrack revert <commit hash>\n");
-            return 1;
         }
-        revert_commit(argv[2]);
+        //revert_commit(argv[2]);
         break;
 
     case Branch:
         if (argc < 3) {
-            print_out(White, "Current branch: %s\n", current_branch());
+            print_out(White, "Current branch: %s\n", get_current_branch_name());
 
         } else if (strcmp(argv[2], "-l") == 0) {
             list_branches();
 
-        } else if (strcmp(argv[2], "-d") == 0 && argc > 3) {
-            delete_branch(argv[3]);
-            // Control -d if no argument passed
+        } else if (strcmp(argv[2], "-d") == 0) {
+            if (argc > 3)
+                delete_branch(argv[3]);
+            else
+                exit_error("Wrong usage: snaptrack branch -d <branch>");
+
         } else {
             create_branch(argv[2]);
         }
@@ -90,6 +93,8 @@ int main(int argc, char *argv[]) {
     default:
         exit_error("Unkwon command: %s\n", argv[1]);
     }
+    free_sha_file();
     cleanup_cabinet();
+    cleanup_paths();
     return 0;
 }

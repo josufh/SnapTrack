@@ -13,15 +13,15 @@
 #include "commit.h"
 
 Command which_command(const char *command) {
-    if (is_same_string(command, "init")) return Init;
-    else if (is_same_string(command, "status")) return Status;
-    else if (is_same_string(command, "stage")) return Stage;
-    else if (is_same_string(command, "unstage")) return Unstage;
-    else if (is_same_string(command, "commit")) return CommitChanges;
-    else if (is_same_string(command, "config")) return Config;
-    else if (is_same_string(command, "revert")) return Revert;
-    else if (is_same_string(command, "branch")) return Branch;
-    else if (is_same_string(command, "checkout")) return Checkout;
+    if (same_string(command, "init")) return Init;
+    else if (same_string(command, "status")) return Status;
+    else if (same_string(command, "stage")) return Stage;
+    else if (same_string(command, "unstage")) return Unstage;
+    else if (same_string(command, "commit")) return CommitChanges;
+    else if (same_string(command, "config")) return Config;
+    else if (same_string(command, "revert")) return Revert;
+    else if (same_string(command, "branch")) return Branch;
+    else if (same_string(command, "checkout")) return Checkout;
     else return UnknownCommand;
 }
 
@@ -45,67 +45,64 @@ void init_repository() {
 void check_status() {
     repo_must_exist(REPO_PATH);
 
-    Files *path_files = new_files_entry();
-    load_path_files(REPO_PATH, path_files);
+    Files *repo_files = get_path_files(REPO_PATH);
+    Files *index_files = get_index_files(INDEX_PATH);
+    Files *last_files = get_branch_index_files(get_current_branch_name());
 
-    Files *index_files = new_files_entry();
-    load_index_files(INDEX_PATH, index_files);
+    foreach_file(last_files, last_file) {
+        foreach_file(repo_files, repo_file) {
+            if (same_path(last_file, repo_file)) {
+                last_file->staged = 1;
 
-    Files *last_files = new_files_entry();
-    get_branch_index_files(current_branch(), last_files);
+                if (same_hash(last_file, repo_file)) {
+                    // File is unchanged
+                    last_file->status = Unchanged; repo_file->status = Unchanged;
 
-    foreach_file(last_files, L) {
-        foreach_file(path_files, R) {
-            if (same_path(L, R)) {
-                L->staged = 1;
-                if (same_hash(L, R)) {
-                    L->status = Unchanged; R->status = Unchanged;
                 } else {
-                    L->status = Modified; R->status = Modified;
-                    foreach_file(index_files, I) {
-                        if (same_file(R, I)) {
-                            R->staged = 1;
-                        }
-                    }
+                    // File was modified
+                    last_file->status = Modified; repo_file->status = Modified;
+                    foreach_file(index_files, index_file) 
+                        if (same_file(repo_file, index_file))
+                            // Modification is staged
+                            repo_file->staged = 1;
                 }
             }
         }
-        if (!L->staged) {
-            if (!does_dir_exist(L->path)) {
-                L->status = Deleted;
-                foreach_file(index_files, I) {
-                    if (same_path(L, I) && I->status == Deleted) {
-                        L->staged = 1;
-                    }
-                }
-            }
+        if (!last_file->staged && !does_dir_exist(last_file->path)) {
+            // File was deleted
+            last_file->status = Deleted;
+
+            foreach_file(index_files, index_file)
+                if (same_path(last_file, index_file) && index_file->status == Deleted)
+                    // Deletion is staged
+                    last_file->staged = 1;
         }
-    }
-    foreach_file(path_files, R) {
-        if (R->status == New)
-            foreach_file(index_files, I) {
-                if (same_file(R, I)) {
-                    R->staged = 1;
-                }
-            }
     }
 
-    const char *file_status_string[] = {"Unchanged", "New", "Modified", "Deleted"};
+    foreach_file(repo_files, repo_file)
+        // For each new file
+        if (repo_file->status == New)
+            foreach_file(index_files, index_file)
+                // Check for staging status
+                if (same_file(repo_file, index_file))
+                    repo_file->staged = 1;
+
+    const char *file_status_string[] = { "Unchanged", "New", "Modified", "Deleted" };
 
     print_out(White, "Staged for commit:\n");
-    foreach_file(index_files, I) {
-        if (I->status != Unchanged)
-            print_out(Green, "\t%s: %s\n", file_status_string[I->status], I->path);
+    foreach_file(index_files, index_file) {
+        if (index_file->status != Unchanged)
+            print_out(Green, "\t%s: %s\n", file_status_string[index_file->status], index_file->path);
     }
 
     print_out(White, "\nNot staged:\n");
-    foreach_file(path_files, R) {
-        if (R->status != Unchanged && !R->staged)
-            print_out(Red, "\t%s: %s\n", file_status_string[R->status], R->path);
+    foreach_file(repo_files, repo_file) {
+        if (repo_file->status != Unchanged && !repo_file->staged)
+            print_out(Red, "\t%s: %s\n", file_status_string[repo_file->status], repo_file->path);
     }
-    foreach_file(last_files, L) {
-        if (L->status == Deleted && !L->staged)
-            print_out(Red, "\t%s: %s\n", file_status_string[L->status], L->path);
+    foreach_file(last_files, last_file) {
+        if (last_file->status == Deleted && !last_file->staged)
+            print_out(Red, "\t%s: %s\n", file_status_string[last_file->status], last_file->path);
     }
 }
 
@@ -113,28 +110,32 @@ void check_status() {
 void stage_files(const char *to_stage_path) {
     repo_must_exist(REPO_PATH);
 
-    Files *to_stage_files = new_files_entry();
-    load_path_files(to_stage_path, to_stage_files);
+    Files *to_stage_files = get_path_files(to_stage_path);
 
-    Files *index_files = new_files_entry();
-    load_index_files(INDEX_PATH, index_files);
+    Files *index_files = get_index_files(INDEX_PATH);
 
     FILE *temp_file = file_open(TEMP_INDEX_PATH, "w");
 
     foreach_file(index_files, index_file) {
         index_file->staged = 0;
         foreach_file(to_stage_files, to_stage_file) {
-            if (is_same_string(to_stage_file->path, index_file->path)) {
+            if (same_path(to_stage_file, index_file)) {
                 index_file->staged = 1;
+
                 if (to_stage_file->status == Deleted) {
+                    // Stage deletion (for single file stage)
                     fprintf(temp_file, "%s %s %d\n", index_file->path, index_file->hash, Deleted);
                     print_out(Red, "Staging deletion of file: %s\n", index_file->path);
-                } else if (!is_same_string(to_stage_file->hash, index_file->hash)) {
-                    print_out(Yellow, "Staging modification of file %s with hash %s\n", to_stage_file->path, to_stage_file->hash);
+
+                } else if (!same_hash(to_stage_file, index_file)) {
+                    // Stage modification
                     to_stage_file->status = Modified;
                     fprintf(temp_file, "%s %s %d\n", to_stage_file->path, to_stage_file->hash, Modified);
                     create_object(*to_stage_file);
+                    print_out(Yellow, "Staging modification of file %s with hash %s\n", to_stage_file->path, to_stage_file->hash);
+
                 } else {
+                    // File is unchanged
                     fprintf(temp_file, "%s %s %d\n", index_file->path, index_file->hash, index_file->status);
                     to_stage_file->status = Unchanged;
                 }
@@ -142,9 +143,12 @@ void stage_files(const char *to_stage_path) {
         }
         if (!index_file->staged) {
             if (strncmp(index_file->path, to_stage_path, strlen(to_stage_path)) == 0 && !does_dir_exist(index_file->path)) {
-                print_out(Red, "Staging deletion of file: %s\n", index_file->path);
+                // Stage deletion (for dir stage)
                 fprintf(temp_file, "%s %s %d\n", index_file->path, index_file->hash, Deleted);
+                print_out(Red, "Staging deletion of file: %s\n", index_file->path);
+
             } else {
+                // No changes
                 fprintf(temp_file, "%s %s %d\n", index_file->path, index_file->hash, index_file->status);
             }
         }
@@ -152,9 +156,10 @@ void stage_files(const char *to_stage_path) {
 
     foreach_file(to_stage_files, path_file) {
         if (path_file->status == New) {
-            print_out(Green, "Staging new file %s with hash %s\n", path_file->path, path_file->hash);
-            create_object(*path_file);
+            // Stage new file
             fprintf(temp_file, "%s %s %d\n", path_file->path, path_file->hash, New);
+            create_object(*path_file);
+            print_out(Green, "Staging new file %s with hash %s\n", path_file->path, path_file->hash);
         }
     }
 
@@ -167,97 +172,62 @@ void stage_files(const char *to_stage_path) {
 void unstage_files(const char *to_unstage_path) {
     repo_must_exist(REPO_PATH);
 
-    Files *to_unstage_files = new_files_entry();
-    load_path_files(to_unstage_path, to_unstage_files);
+    Files *to_unstage_files = get_path_files(to_unstage_path);
 
-    Files *index_files = new_files_entry();
-    char index_path[MAX_PATH];
-    snprintf(index_path, MAX_PATH, "%s\\.snaptrack\\index", REPO_PATH);
-    load_index_files(index_path, index_files);
+    Files *index_files = get_index_files(INDEX_PATH);
 
-    char temp_path[MAX_PATH];
-    snprintf(temp_path, MAX_PATH, "%s\\.snaptrack\\temp_index", REPO_PATH);
-    FILE *temp_file = file_open(temp_path, "w");
+    FILE *temp_file = file_open(TEMP_INDEX_PATH, "w");
 
     print_out(White, "Unstaged files:\n");
-    foreach_file(index_files, I) {
+    foreach_file(index_files, index_file) {
         int found = 0;
-        foreach_file(to_unstage_files, R) {
-            if (is_same_string(I->path, R->path)) {
-                found = 1;
-                print_out(Yellow, "\t%s\n", I->path);
-                _i_R = to_unstage_files->count;
+        foreach_file(to_unstage_files, unstage_file) {
+            if (same_path(index_file, unstage_file)) {
+                if (index_file->status != Unchanged) {
+                    found = 1;
+                    print_out(Yellow, "\t%s\n", index_file->path);
+                }
+                _i_unstage_file = to_unstage_files->count;
             }
         }
         if (!found) {
-            fprintf(temp_file, "%s %s %d\n", I->path, I->hash, I->status);
+            fprintf(temp_file, "%s %s %d\n", index_file->path, index_file->hash, index_file->status);
         }
     }
 
     fclose(temp_file);
-    remove(index_path);
-    rename(temp_path, index_path);
+    remove(INDEX_PATH);
+    rename(TEMP_INDEX_PATH, INDEX_PATH);
 }
 
 // Commit
 void commit_changes(const char *commit_message) {
     repo_must_exist(REPO_PATH);
-    Commit commit = {0};
 
-    init_sha_file();
+    Files *index_files = get_index_files(INDEX_PATH);
+    FILE *temp_file = file_open(TEMP_INDEX_PATH, "w");
 
-    // Get index file hash and store object
-    File index_file = {0};
-    snprintf(index_file.path, MAX_PATH, "%s\\.snaptrack\\index", REPO_PATH);
-    
-    Files *index_files = new_files_entry();
-    load_index_files(index_file.path, index_files);
-    char temp_path[MAX_PATH];
-    snprintf(temp_path, MAX_PATH, "%s\\.snaptrack\\temp_index", REPO_PATH);
-    FILE *temp_file = file_open(temp_path, "w");
-
-    foreach_file(index_files, I) {
-        if (I->status != Deleted)
-            fprintf(temp_file, "%s %s %d\n", I->path, I->hash, Unchanged);
+    foreach_file(index_files, index_file) {
+        if (index_file->status != Deleted)
+            fprintf(temp_file, "%s %s %d\n", index_file->path, index_file->hash, Unchanged);
     }
 
     fclose(temp_file);
 
-    remove(index_file.path);
-    rename(temp_path, index_file.path);
+    remove(INDEX_PATH);
+    rename(TEMP_INDEX_PATH, INDEX_PATH);
     
-    char index_hash[SHA1_STRING_SIZE];
-    unsigned char hash[SHA1_BLOCK_SIZE];
-    sha_file(index_file.path, hash);
-    sha1_to_hex(hash, index_file.hash);
+    char *index_hash = new_hash(INDEX_PATH);
 
-    strncpy(commit.index_hash, index_file.hash, sizeof(index_file.hash));
+    Commit commit = {0};
 
-    char object_path[MAX_PATH];
-    snprintf(object_path, MAX_PATH, "%s\\.snaptrack\\objects\\%s", REPO_PATH, index_file.hash);
-    FILE *object_file = file_open(object_path, "wb");
-    FILE *src_file = file_open(index_file.path, "rb");
+    strncpy(commit.index_hash, index_hash, SHA1_STRING_SIZE);
 
-    int c;
-    while ((c = fgetc(src_file)) != EOF) {
-        fputc(c, object_file);
-    }
-
-    fclose(object_file); fclose(src_file);
+    File index_file = {INDEX_PATH, index_hash, 0, 0};
+    create_object(index_file);
 
     // Get last commit hash
-    char head_path[MAX_PATH];
-    snprintf(head_path, MAX_PATH, "%s\\.snaptrack\\HEAD", REPO_PATH);
-    FILE *head_file = file_open(head_path, "r");
-    char branch_path[MAX_PATH];
-    fgets(branch_path, MAX_PATH, head_file);
-    fclose(head_file);
-
-    char current_branch_path[MAX_PATH];
-    snprintf(current_branch_path, MAX_PATH, "%s\\.snaptrack\\%s", REPO_PATH, branch_path);
-    FILE *current_branch_file = file_open(current_branch_path, "r");
-    char last_commit[SHA1_STRING_SIZE] = {0};
-    fgets(last_commit, sizeof(last_commit), current_branch_file);
+    char *last_commit = get_branch_commit_hash(get_current_branch_name());
 
     strncpy(commit.parent, last_commit, sizeof(commit.parent));
 
@@ -283,30 +253,22 @@ void commit_changes(const char *commit_message) {
                 commit.timestamp, commit.message);
     
     File temp_commit = {0};
-    snprintf(temp_commit.path, MAX_PATH, "%s\\.snaptrack\\temp_commit", REPO_PATH);
+    temp_commit.path = new_path("%s\\.snaptrack\\temp_commit", REPO_PATH);
     FILE *temp_commit_file = file_open(temp_commit.path, "w");
     fprintf(temp_commit_file, "%s", commit_content);
     fclose(temp_commit_file);
 
-    sha_file(temp_commit.path, hash);
-    sha1_to_hex(hash, temp_commit.hash);
-    
-    snprintf(object_path, MAX_PATH, "%s\\.snaptrack\\objects\\%s", REPO_PATH, temp_commit.hash);
-    object_file = file_open(object_path, "wb");
-    src_file = file_open(temp_commit.path, "rb");
+    temp_commit.hash = new_hash(temp_commit.path);
 
-    while ((c = fgetc(src_file)) != EOF) {
-        fputc(c, object_file);
-    }
-    fclose(object_file); fclose(src_file);
+    create_object(temp_commit);
 
     // Update last commit
-    current_branch_file = file_open(current_branch_path, "w");
+    char *current_branch_path = new_path("%s%s", BRANCHES_PATH, get_current_branch_name());
+    FILE *current_branch_file = file_open(current_branch_path, "w");
     fprintf(current_branch_file, "%s", temp_commit.hash);
     fclose(current_branch_file);
 
     remove(temp_commit.path);
-    free_sha_file();
 
     printf("TODO: Commit done message\n");
 }
@@ -316,13 +278,12 @@ void list_commits() {
     Commit *commits = NULL;
     int commit_count = 0;
 
-    char last_commit_hash[SHA1_STRING_SIZE] = {0};
-    get_branch_commit_hash(current_branch(), last_commit_hash);
+    char *last_commit_hash = get_branch_commit_hash(get_current_branch_name());
 
     print_out(White, "\tCommit log in");
-    print_out(Green, " %s ", current_branch());
+    print_out(Green, " %s ", get_current_branch_name());
     print_out(White, "branch\n\n");
-    while (strcmp(last_commit_hash, "") != 0) {
+    while (!STRING_EMPTY(last_commit_hash)) {
         Commit commit = {0};
         get_commit_info(&commit, last_commit_hash);
         strcpy(last_commit_hash, commit.parent);
@@ -337,18 +298,11 @@ void list_commits() {
 
 // Revert commit
 void revert_commit(const char *revert_hash) {
-    init_sha_file();
-
     Commit revert_commit = {0};
     get_commit_info(&revert_commit, revert_hash);
 
-    Files *revert_files = new_files_entry();
-    char revert_index_blob_path[MAX_PATH] = {0};
-    snprintf(revert_index_blob_path, MAX_PATH, "%s\\.snaptrack\\objects\\%s", REPO_PATH, revert_commit.index_hash);
-    load_index_files(revert_index_blob_path, revert_files);
-
-    Files *repo_files = new_files_entry();
-    load_path_files(REPO_PATH, repo_files);
+    Files *revert_files = get_index_files_from_index_hash(revert_commit.index_hash);
+    Files *repo_files = get_path_files(REPO_PATH);
 
     foreach_file(revert_files, revert_file) {
         char blob_path[MAX_PATH];
@@ -366,7 +320,7 @@ void revert_commit(const char *revert_hash) {
         fclose(read); fclose(write);
 
         foreach_file(repo_files, repo_file) {
-            if (is_same_string(revert_file->path, repo_file->path)) {
+            if (same_path(revert_file, repo_file)) {
                 //repo_file->status = Staged;
                 break;
             }
@@ -389,100 +343,55 @@ void revert_commit(const char *revert_hash) {
 void list_branches() {
     repo_must_exist(REPO_PATH);
 
-    char branches_path[MAX_PATH];
-    snprintf(branches_path, MAX_PATH, "%s\\.snaptrack\\refs\\branches", REPO_PATH);
-
-    Branches branches = {0};
-
-    DIR *dir = opendir(branches_path);
-    struct dirent *entry;
-    while((entry = readdir(dir)) != NULL) {
-        if (is_same_string(entry->d_name, ".") || is_same_string(entry->d_name, "..")) continue;
-        char *branch = malloc_string(entry->d_namlen);
-        strcpy(branch, entry->d_name);
-        DA_ADD(branches, branch);
-    }
-    closedir(dir);
-
-    fprintf(stdout, "Branch list:\n");
+    Branches *branches = get_branches();
+    print_out(White, "Branch list:\n");
     foreach_branch(branches, branch) {
-        fprintf(stdout, "\t%s\n", branch);
+        print_out(White, "\t%s\n", branch);
     }
-
-    DA_FREE(branches);
+    free_branches(branches);
 }
 
 void create_branch(const char *branch_name) {
     repo_must_exist(REPO_PATH);
-    char branches_path[MAX_PATH];
-    snprintf(branches_path, MAX_PATH, "%s\\.snaptrack\\refs\\branches", REPO_PATH);
 
-    Branches branches = {0};
+    char *branches_path = new_path("%s\\.snaptrack\\refs\\branches", REPO_PATH);
 
-    DIR *dir = opendir(branches_path);
-    struct dirent *entry;
-    while((entry = readdir(dir)) != NULL) {
-        if (is_same_string(entry->d_name, ".") || is_same_string(entry->d_name, "..")) continue;
-        char *branch = malloc_string(entry->d_namlen);
-        strcpy(branch, entry->d_name);
-        DA_ADD(branches, branch);
-    }
-    closedir(dir);
+    Branches *branches = get_branches();
 
     int is_new_branch = 1;
-    foreach_branch(branches, branch) {
-        if (is_same_string(branch, branch_name)) {
+    foreach_branch(branches, branch)
+        if (same_string(branch, branch_name))
             is_new_branch = 0;
-            break;
-        }
-    }
-    DA_FREE(branches);
 
-    if (!is_new_branch) {
-        fprintf(stdout, "Branch with name %s already exists\n", branch_name);
-        return;
-    }
+    free_branches(branches);
 
-    char current_branch_relative_path[MAX_PATH];
-    current_branch_path(current_branch_relative_path);
-    char current_branch_path[MAX_PATH];
-    snprintf(current_branch_path, MAX_PATH, "%s\\.snaptrack\\%s", REPO_PATH, current_branch_relative_path);
-    FILE *current_branch_file = file_open(current_branch_path, "r");
+    if (!is_new_branch)
+        exit_error("Branch with name %s already exists\n", branch_name);
 
-    char commit_hash[SHA1_STRING_SIZE];
-    fgets(commit_hash, SHA1_STRING_SIZE, current_branch_file);
-    fclose(current_branch_file);
+    char *commit_hash = get_branch_commit_hash(get_current_branch_name());
 
-    char new_branch_file_path[MAX_PATH];
-    snprintf(new_branch_file_path, MAX_PATH, "%s\\.snaptrack\\refs\\branches\\%s", REPO_PATH, branch_name);
+    char *new_branch_file_path = new_path("%s%s", BRANCHES_PATH, branch_name);
 
     FILE *new_branch_file = file_open(new_branch_file_path, "w");
     fputs(commit_hash, new_branch_file);
     fclose(new_branch_file);
 
-    char head_path[MAX_PATH];
-    snprintf(head_path, MAX_PATH, "%s\\.snaptrack\\HEAD", REPO_PATH);
-    FILE *head_file = file_open(head_path, "w");
-
-    fprintf(head_file, "refs\\branches\\%s", branch_name);
-    fclose(head_file);
+    change_head(branch_name);
 }
 
-void delete_branch(const char *branch_name_to_delete) {
+void delete_branch(const char *to_delete_branch_name) {
     repo_must_exist(REPO_PATH);
-    char branch_path[MAX_PATH];
-    current_branch_path(branch_path);
 
-    char branch_name[256];
-    strcpy(branch_name, strrchr(branch_path, '\\')+1);
+    if (same_string(to_delete_branch_name, "main"))
+        exit_error("Unable to delete main branch\n");
 
-    if (is_same_string(branch_name_to_delete, branch_name)) {
-        printf("Failed to delete: trying to delete current branch\n");
-        return;
-    }
 
-    char branch_file_path_to_delete[MAX_PATH];
-    snprintf(branch_file_path_to_delete, MAX_PATH, "%s\\.snaptrack\\refs\\branches\\%s", REPO_PATH, branch_name_to_delete);
+    char *current_branch_name = get_current_branch_name();
+
+    if (same_string(to_delete_branch_name, current_branch_name))
+        exit_error("Failed to delete: trying to delete current branch\n");
+
+    char *branch_file_path_to_delete = new_path("%s%s", BRANCHES_PATH, to_delete_branch_name);
 
     remove(branch_file_path_to_delete);
 }
@@ -493,26 +402,24 @@ void checkout_branch(const char *branch_name) {
     if (are_there_changes())
         exit_error("Uncommited changes in current branch\nCommit changes before changing branch or restore to previous commit\n");
     
-    Files *branch_files = new_files_entry();
-    get_branch_index_files(branch_name, branch_files);
+    Files *branch_files = get_branch_index_files(branch_name);
 
-    Files *current_files = new_files_entry();
-    get_branch_index_files(current_branch(), current_files);
+    Files *current_files = get_branch_index_files(get_current_branch_name());
 
-    foreach_file(current_files, C) {
-        foreach_file(branch_files, B) {
-            if (same_file(C, B)) {
-                C->staged = 1; B->staged = 1;
-                _i_B = branch_files->count;
+    foreach_file(current_files, current_file) {
+        foreach_file(branch_files, branch_file) {
+            if (same_file(current_file, branch_file)) {
+                current_file->staged = 1; branch_file->staged = 1;
+                _i_branch_file = branch_files->count;
             }
         }
-        if (!C->staged)
-            remove(C->path);
+        if (!current_file->staged)
+            remove(current_file->path);
     }
 
-    foreach_file(branch_files, B) {
-        if (!B->staged) {
-            create_src_from_object(B);
+    foreach_file(branch_files, branch_file) {
+        if (!branch_file->staged) {
+            create_src_from_object(branch_file);
         }
     }
 

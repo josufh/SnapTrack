@@ -26,7 +26,7 @@ void init_sha_file() {
     sha_file = (SHA1FileFunc)sha_dll.func;
 }
 
-void sha1_to_hex(unsigned char hash[SHA1_BLOCK_SIZE], char output[SHA1_STRING_SIZE]) {
+void sha1_to_hex(const unsigned char *hash, char *output) {
     for (int i = 0; i < SHA1_BLOCK_SIZE; i++) {
         sprintf(output + (i*2), "%02x", hash[i]);
     }

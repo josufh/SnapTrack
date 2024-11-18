@@ -7,8 +7,6 @@
 #include "sha.h"
 #include "path.h"
 
-int is_same_string(const char *string1, const char *string2);
-
 typedef enum {
     Unchanged,
     New,
@@ -17,8 +15,8 @@ typedef enum {
 } FileStatus;
 
 typedef struct {
-    char path[MAX_PATH];
-    char hash[SHA1_STRING_SIZE];
+    char *path;
+    char *hash;
     FileStatus status;
     int staged;
 } File;
@@ -35,11 +33,11 @@ Files *new_files_entry();
 void cleanup_cabinet();
 
 File *malloc_file();
-char *malloc_string(size_t size);
 
-void load_index_files(const char *path, Files *files);
-void load_path_files(const char *path, Files *files);
+Files *get_index_files(const char *path);
+Files *get_path_files(const char *path);
 
+void copy_file(const char *dest, const char *src);
 void create_object(File file);
 
 FILE *file_open(const char* path, const char* mode);

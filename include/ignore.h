@@ -5,11 +5,10 @@
 
 #include "dynamic_array.h"
 
-#define IgnorePatterns DynamicArray
+typedef DynamicArray IgnorePatterns;
 extern IgnorePatterns ignore_patterns;
 
 int wildcard_match(const char *pattern, const char *str);
-char *get_pattern_at_index(IgnorePatterns patterns, size_t index);
 int should_ignore(const char *filename, IgnorePatterns patterns, int is_dir);
 
 void load_ignore_patterns();

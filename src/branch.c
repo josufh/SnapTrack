@@ -4,21 +4,35 @@
 #include "print.h"
 #include "commit.h"
 
-int does_branch_exist(const char *branch_name) {
-    Branches branches = {0};
+Branches *get_branches() {
+    Branches *branches = (Branches *)malloc(sizeof(Branches));
+    if (!branches)
+        exit_error("Error allocating memory @ get_branches\n");
+    DA_INIT(*branches);
 
     DIR *dir = opendir(BRANCHES_PATH);
     struct dirent *entry;
     while((entry = readdir(dir)) != NULL) {
-        if (is_same_string(entry->d_name, ".") || is_same_string(entry->d_name, "..")) continue;
+        if (same_string(entry->d_name, ".") || same_string(entry->d_name, "..")) continue;
         char *branch = malloc_string(entry->d_namlen);
         strcpy(branch, entry->d_name);
         add_branch(branches, branch);
     }
     closedir(dir);
 
+    return branches;
+}
+
+void free_branches(Branches *branches) {
+    DA_FREE(*branches);
+    free(branches);
+}
+
+int does_branch_exist(const char *branch_name) {
+    Branches *branches = get_branches();
+
     foreach_branch(branches, branch) {
-        if (is_same_string(branch, branch_name)) {
+        if (same_string(branch, branch_name)) {
             free_branches(branches);
             return 1;
         }
@@ -27,25 +41,25 @@ int does_branch_exist(const char *branch_name) {
     return 0;
 }
 
-void get_branch_commit_hash(const char* branch, char *hash) {
+char *get_branch_commit_hash(const char* branch) {
     if (!does_branch_exist(branch))
         exit_error("Branch %s does not exist\n", branch);
 
-    char branch_path[MAX_PATH];
-    snprintf(branch_path, MAX_PATH, "%s%s", BRANCHES_PATH, branch);
+    char *branch_path = new_path("%s%s", BRANCHES_PATH, branch);
     FILE *branch_file = file_open(branch_path, "r");
 
+    char *hash = new_hash(NULL);
     fgets(hash, SHA1_STRING_SIZE, branch_file);
+    return hash;
 }
 
-void get_branch_index_files(const char *branch, Files *index_files) {
-    char commit_hash[SHA1_STRING_SIZE] = {0};
-    get_branch_commit_hash(branch, commit_hash);
+Files *get_branch_index_files(const char *branch) {
+    char *commit_hash = get_branch_commit_hash(branch);
+    if (STRING_EMPTY(commit_hash)) return new_files_entry();
 
-    char index_hash[SHA1_STRING_SIZE] = {0};
-    get_index_hash_from_commit_hash(commit_hash, index_hash);
+    char *index_hash = get_index_hash_from_commit_hash(commit_hash);
 
-    load_index_files_from_index_hash(index_hash, index_files);
+    return get_index_files_from_index_hash(index_hash);
 }
 
 void change_head(const char *branch) {
@@ -54,21 +68,21 @@ void change_head(const char *branch) {
     fclose(head_file);
 }
 
-void current_branch_path(char *branch_path) {
+char *get_current_branch_path() {
+    char *branch_path = new_path("");
     FILE *head_file = file_open(HEAD_PATH, "r");
     fscanf(head_file, "%s", branch_path);
     fclose(head_file);
+    return branch_path;
 }
 
-char *current_branch() {
+char *get_current_branch_name() {
     repo_must_exist(REPO_PATH);
 
-    char branch_path[MAX_PATH];
-    current_branch_path(branch_path);
+    char *branch_path = get_current_branch_path();
 
     static char branch_name[256];
     strcpy(branch_name, strrchr(branch_path, '\\')+1);
 
     return branch_name;
 }
-

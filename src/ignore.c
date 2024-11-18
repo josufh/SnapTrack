@@ -54,24 +54,13 @@ int wildcard_match(const char *pattern, const char *str) {
     return *str == '\0';
 }
 
-char *get_pattern_at_index(IgnorePatterns patterns, size_t index) {
-    return (char *)DA_GET(patterns, index);
-}
-
 int should_ignore(const char *filename, IgnorePatterns patterns, int is_dir) {
-    for (int i = 0; i < patterns.count; i++) {
-        const char *pattern = get_pattern_at_index(patterns, i);
-        
-        char full_path[MAX_PATH];
-        if (is_dir) {
-            snprintf(full_path, MAX_PATH, "%s\\", filename);
-        } else {
-            strncpy(full_path, filename, MAX_PATH);
-        }
+    DA_FOREACH(ignore_patterns, pattern, char *) {
 
-        if (wildcard_match(pattern, full_path)) {
+        char *full_path = is_dir ? new_path("%s\\", filename) : new_path(filename) ;
+
+        if (wildcard_match(pattern, full_path))
             return 1;
-        }
     }
     return 0;
 }

@@ -18,8 +18,8 @@ typedef struct {
 //typedef DynamicArray Commits;
 
 FILE* obj_file_open(const char *hash, const char *mode);
-void get_index_hash_from_commit_hash(const char *commit_hash, char *index_hash);
-void load_index_files_from_index_hash(const char *hash, Files *files);
+char *get_index_hash_from_commit_hash(const char *commit_hash);
+Files *get_index_files_from_index_hash(const char *hash);
 void create_src_from_object(File *file);
 void rewrite_index_file(Files *files);
 int are_there_changes();
