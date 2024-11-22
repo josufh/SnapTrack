@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
 
     case Branch:
         if (argc < 3) {
-            print_out(White, "Current branch: %s\n", get_current_branch_name());
+            print_out(White, "Current branch: %s\n", WORKING_BRANCH);
 
         } else if (strcmp(argv[2], "-l") == 0) {
             list_branches();

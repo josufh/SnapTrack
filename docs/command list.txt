@@ -1,0 +1,24 @@
+{help} ok
+<command< help ok
+init ok
+config {<field> {<value>}} ok
+status ok
+stage <paths> ok
+unstage <paths> ok
+commit "message" ok
+commit -c "message" ok
+commit -l ok
+clean ok
+revert <hash> ok
+restore <paths> ok
+branch {<branch name>} ok
+branch -l ok
+branch -d <branch name> ok
+checkout <branch name> ok
+merge <branch name> ok
+remote add <remote name>
+remote delete <remote name>
+remote list
+clone <remote name>
+pull <remote name> {<branch name>}
+push <remote name> {>branch name>}

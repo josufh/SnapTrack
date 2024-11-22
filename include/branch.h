@@ -5,6 +5,8 @@
 #include "path.h"
 #include "file.h"
 
+#define WORKING_BRANCH get_current_branch_name()
+
 typedef DynamicArray Branches;
 #define foreach_branch(branches, branch) DA_FOREACH((*branches), branch, char *)
 #define add_branch(branches, branch) DA_ADD((*branches), branch)

@@ -5,9 +5,9 @@
 #include "file.h"
 
 typedef struct {
-    char index_hash[SHA1_STRING_SIZE];
-    char parent[SHA1_STRING_SIZE];
     char hash[SHA1_STRING_SIZE];
+    char parent[SHA1_STRING_SIZE];
+    char index_hash[SHA1_STRING_SIZE];
     char author_name[256];
     char author_email[256];
     char author_userid[256];

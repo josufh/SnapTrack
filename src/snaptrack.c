@@ -34,8 +34,9 @@ void init_repository() {
     make_directory("objects");
     make_directory("refs");
     make_directory("refs\\branches");
+    make_directory("refs\\remotes");
     
-    create_file("refs\\branches\\main", "");
+    create_file("refs\\branches\\main", NULL);
     create_file("HEAD", "refs\\branches\\main");
     create_file("index", NULL);
 
@@ -368,8 +369,6 @@ void create_branch(const char *branch_name) {
     FILE *new_branch_file = file_open(new_branch_file_path, "w");
     fputs(commit_hash, new_branch_file);
     fclose(new_branch_file);
-
-    change_head(branch_name);
 }
 
 void delete_branch(const char *to_delete_branch_name) {
